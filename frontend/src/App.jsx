@@ -61,6 +61,38 @@ function App() {
     setBackendMessage(data.message)
   }
 
+  function DisplayClassSchedule() {
+    const meetings = backendMessage.class_schedule.meetings;
+    return (
+      <div>
+        <h2>Class Times</h2>
+        {meetings.map((meeting) => (
+          <div key={meeting.title}>
+            <h2>Title: {meeting.title}</h2>
+            <p>Every {meeting.days_of_week.join(', ')}</p>
+            <p>From: {meeting.start_time} to {meeting.end_time}</p>
+            <p>At: {meeting.location}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function DisplayTasks() {
+    const tasks = backendMessage.tasks;
+    return (
+      <div>
+        <h2>Tasks</h2>
+        {tasks.map((task) => (
+          <div key={task.title}>
+            <p>Title: {task.title}</p>
+            <p>Due Date: {task.due_date}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: "40px", fontFamily: "Arial" }}>
       <h1>Syllabus Calendar App</h1>
@@ -83,10 +115,12 @@ function App() {
         </div>
       )} */}
 
-      {backendMessage && (
+      {backendMessage?.course?.course_name && (
         <div>
           <p>Message from backend: </p>
-          <p>{backendMessage}</p>
+          <h1>{backendMessage.course.course_name}</h1>
+          <DisplayClassSchedule />
+          <DisplayTasks />
         </div>
       )}
 
