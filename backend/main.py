@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 import base64
 from openai import OpenAI
 
+import json
+
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -265,7 +267,7 @@ async def upload_syllabus(file: UploadFile = File(...)):
 
     print("sending response")
 
-    return response.output_text
+    return json.loads(response.output_text)
 
 @app.get("/test-openai")
 def test_openai():
