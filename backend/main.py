@@ -2,7 +2,7 @@
 # python -m pip install -r requirements.txt
 # uvicorn main:app --reload
 
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Body
 from fastapi.middleware.cors import CORSMiddleware
 
 import os
@@ -268,6 +268,201 @@ async def upload_syllabus(file: UploadFile = File(...)):
     print("sending response")
 
     return json.loads(response.output_text)
+
+def create_repeating_event(
+    service,
+    name,
+    start,
+    end,
+    repeat_days,
+    repeat_until,
+    description="",
+    location=""
+    ):
+    day_map = {
+        "Monday": "MO",
+        "Tuesday": "TU",
+        "Wednesday": "WE",
+        "Thursday": "TH",
+        "Friday": "FR",
+        "Saturday": "SA",
+        "Sunday": "SU",
+    }
+
+    byday = ",".join(day_map[day] for day in repeat_days)
+    until = repeat_until.replace("-", "") + "T235959Z" # T235959Z means end of day (11:59pm)
+
+    body = {
+        "summary": name,
+        "description": description,
+        "start": {
+            "dateTime": start,
+            "timeZone": "America/New_York",
+        },
+        "end": {
+            "dateTime": end,
+            "timeZone": "America/New_York",
+        },
+        "location": location,
+        "recurrence": [
+            f"RRULE:FREQ=WEEKLY;BYDAY={byday};UNTIL={until}"
+        ]
+    }
+
+    service.events().insert(calendarId="primary", body=body).execute()
+
+def create_event(
+    service, 
+    name, 
+    start, 
+    end, 
+    description="", 
+    location="", 
+    timezone="America/New_York"
+):
+    body = {
+        "summary": name,
+        "description": description,
+        "start": {
+            "dateTime": start,
+            "timeZone": timezone,
+        },
+        "end": {
+            "dateTime": end,
+            "timeZone": timezone,
+        },
+        "location": location
+    }
+    
+    service.events().insert(calendarId="primary", body=body).execute()
+
+def create_task(
+    service,
+    name,
+    due_date,
+    due_time=None,
+    description="",
+    tasklist="@default"
+):
+    if due_time:
+        due = f"{due_date}T{due_time}:00.000Z"
+    else:
+        due = f"{due_date}T00:00:00.000Z"
+
+    body = {
+        "title": name,
+        "notes": description,
+        "due": due,
+    }
+
+    service.tasks().insert(tasklist=tasklist, body=body).execute()
+
+def add_class_schedule(payload, service):
+    class_schedule = payload.get("class_schedule", {})
+    meetings = class_schedule.get("meetings", [])
+
+    if not meetings:
+        return
+
+    for meeting in meetings:
+        title = meeting.get("title", "Class Meeting")
+        days_of_week = meeting.get("days_of_week", [])
+        start_time = meeting.get("start_time")
+        end_time = meeting.get("end_time")
+        start_date = meeting.get("start_date")
+        end_date = meeting.get("end_date")
+        location = meeting.get("location", "")
+
+        if not (days_of_week and start_time and end_time and start_date and end_date):
+            continue
+
+        start = f"{start_date}T{start_time}:00"
+        end = f"{start_date}T{end_time}:00"
+
+        create_repeating_event(
+            service,
+            title,
+            start,
+            end,
+            days_of_week,
+            end_date,
+            location=location,
+        )
+
+def add_calendar_events(payload, service):
+    calendar_events = payload.get("calendar_events", [])
+
+    if not calendar_events:
+        return
+
+    for event in calendar_events:
+        date = event.get("date")
+        start_time = event.get("start_time")
+        end_time = event.get("end_time")
+        if not (date and start_time and end_time):
+            continue
+
+        start = date + "T" + start_time + ":00"
+        end = date + "T" + end_time + ":00"
+        create_event(
+            service, 
+            event.get("title", "Calendar Event"), 
+            start, 
+            end, 
+            event.get("description", ""), # this is if we want descriptions included, if not then make this ""
+            event.get("location", "")
+        )
+
+def add_tasks(payload, service):
+    tasks = payload.get("tasks", [])
+
+    if not tasks:
+        return
+
+    for task in tasks:
+        due_date = task.get("due_date")
+        if not due_date:
+            continue
+
+        create_task(
+            service,
+            task.get("title", "Task"),
+            due_date,
+            task.get("due_time"),
+            task.get("description", ""),
+        )
+
+def add_readings(payload, service): 
+    readings = payload.get("readings", [])
+
+    if not readings:
+        return
+
+    for reading in readings:
+        due_date = reading.get("due_date")
+        if not due_date:
+            continue
+
+        create_task(
+            service,
+            reading.get("title", "Reading"),
+            due_date,
+            reading.get("due_time"),
+            reading.get("description", ""),
+        )
+
+@app.post("/add-events")
+def add_events(payload: dict = Body(...)):
+    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+    calendar_service = build("calendar", "v3", credentials=creds)
+    tasks_service = build("tasks", "v1", credentials=creds)
+    
+    add_class_schedule(payload, calendar_service)
+    add_calendar_events(payload, calendar_service)
+    add_tasks(payload, tasks_service)
+    add_readings(payload, tasks_service)
+
+    return {"message": "Events added successfully"}
 
 @app.get("/test-openai")
 def test_openai():
