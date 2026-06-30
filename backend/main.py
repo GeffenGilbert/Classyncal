@@ -14,6 +14,7 @@ from openai import OpenAI
 import json
 
 from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -84,7 +85,23 @@ def google_auth_callback(request: Request):
     with open("token.json", "w") as token_file:
         token_file.write(credentials.to_json())
 
-    return {"message": "Google account connected successfully"}
+        return HTMLResponse(
+                content="""
+                <!doctype html>
+                <html>
+                    <body>
+                        <script>
+                            if (window.opener) {
+                                window.opener.postMessage({ type: 'google-auth-success' }, 'http://localhost:5173');
+                                window.close();
+                            } else {
+                                document.body.textContent = 'Google account connected successfully. You can close this window.';
+                            }
+                        </script>
+                    </body>
+                </html>
+                """
+        )
 
 @app.get("/test-calendar")
 def test_calendar():
@@ -251,6 +268,8 @@ async def upload_syllabus(file: UploadFile = File(...)):
                             - Example: "Apr 27 - May 3" means due_date is "2026-05-03"
                             - In the description, mention that the due date was inferred from the end of the listed week range
                             - Set confidence to "medium" when the due date is inferred from a week range rather than explicitly stated
+                            - For class_schedule.meetings[].days_of_week, always return a flat array of full day names only. Allowed values are "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday". Never return abbreviations like "M", "T", "W", "R", "F", "TR", "MW", or "MWF". For example, if the syllabus says "TR", return ["Tuesday", "Thursday"], not ["TR"] and not [["Tuesday", "Thursday"]].
+                            - For class_schedule.meetings[].title, always use the course_code followed by the meeting type. Examples: "CSC 242 Lecture", "CSC 242 Lab", "CSC 242 Recitation", "CSC 242 Discussion". Do not use only "Lecture" or only the course name. If the meeting type is unclear, use "Class", for example "CSC 242 Class".
                         """
                     },
                 ],
@@ -276,8 +295,10 @@ def create_repeating_event(
     end,
     repeat_days,
     repeat_until,
+    location="", 
+    colorId=None,
     description="",
-    location=""
+    timezone="America/New_York"
     ):
     day_map = {
         "Monday": "MO",
@@ -287,27 +308,47 @@ def create_repeating_event(
         "Friday": "FR",
         "Saturday": "SA",
         "Sunday": "SU",
+
+        "Mon": "MO",
+        "Tue": "TU",
+        "Tues": "TU",
+        "Wed": "WE",
+        "Thu": "TH",
+        "Thur": "TH",
+        "Thurs": "TH",
+        "Fri": "FR",
+        "Sat": "SA",
+        "Sun": "SU",
+
+        "M": "MO",
+        "T": "TU",
+        "W": "WE",
+        "R": "TH",
+        "F": "FR",
     }
 
     byday = ",".join(day_map[day] for day in repeat_days)
-    until = repeat_until.replace("-", "") + "T235959Z" # T235959Z means end of day (11:59pm)
+    until = repeat_until.replace("-", "")
 
     body = {
         "summary": name,
         "description": description,
         "start": {
             "dateTime": start,
-            "timeZone": "America/New_York",
+            "timeZone": timezone,
         },
         "end": {
             "dateTime": end,
-            "timeZone": "America/New_York",
+            "timeZone": timezone,
         },
         "location": location,
         "recurrence": [
             f"RRULE:FREQ=WEEKLY;BYDAY={byday};UNTIL={until}"
         ]
     }
+    if colorId:
+        body["colorId"] = str(colorId)
+    print(body)
 
     service.events().insert(calendarId="primary", body=body).execute()
 
@@ -318,21 +359,38 @@ def create_event(
     end, 
     description="", 
     location="", 
-    timezone="America/New_York"
+    colorId = None, 
+    timezone="America/New_York",
+    all_day=False
 ):
-    body = {
-        "summary": name,
-        "description": description,
-        "start": {
-            "dateTime": start,
-            "timeZone": timezone,
-        },
-        "end": {
-            "dateTime": end,
-            "timeZone": timezone,
-        },
-        "location": location
-    }
+    if all_day:
+        body = {
+            "summary": name,
+            "description": description,
+            "start": {
+                "date": start,
+            },
+            "end": {
+                "date": end,
+            },
+            "location": location
+        }
+    else:
+        body = {
+            "summary": name,
+            "description": description,
+            "start": {
+                "dateTime": start,
+                "timeZone": timezone,
+            },
+            "end": {
+                "dateTime": end,
+                "timeZone": timezone,
+            },
+            "location": location
+        }
+    if colorId:
+        body["colorId"] = str(colorId)
     
     service.events().insert(calendarId="primary", body=body).execute()
 
@@ -357,7 +415,7 @@ def create_task(
 
     service.tasks().insert(tasklist=tasklist, body=body).execute()
 
-def add_class_schedule(payload, service):
+def add_class_schedule(payload, service, color_id):
     class_schedule = payload.get("class_schedule", {})
     meetings = class_schedule.get("meetings", [])
 
@@ -385,11 +443,12 @@ def add_class_schedule(payload, service):
             start,
             end,
             days_of_week,
-            end_date,
-            location=location,
+            end_date, 
+            location, 
+            color_id
         )
 
-def add_calendar_events(payload, service):
+def add_calendar_events(payload, service, color_id):
     calendar_events = payload.get("calendar_events", [])
 
     if not calendar_events:
@@ -399,18 +458,33 @@ def add_calendar_events(payload, service):
         date = event.get("date")
         start_time = event.get("start_time")
         end_time = event.get("end_time")
-        if not (date and start_time and end_time):
+        if not date:
             continue
 
-        start = date + "T" + start_time + ":00"
-        end = date + "T" + end_time + ":00"
+        if start_time and end_time:
+            start = date + "T" + start_time + ":00"
+            end = date + "T" + end_time + ":00"
+            create_event(
+                service, 
+                event.get("title", "Calendar Event"), 
+                start, 
+                end, 
+                event.get("description", ""), # this is if we want descriptions included, if not then make this ""
+                event.get("location", ""), 
+                color_id
+            )
+            continue
+
+        next_day = date
         create_event(
-            service, 
-            event.get("title", "Calendar Event"), 
-            start, 
-            end, 
-            event.get("description", ""), # this is if we want descriptions included, if not then make this ""
-            event.get("location", "")
+            service,
+            event.get("title", "Calendar Event"),
+            date,
+            next_day,
+            event.get("description", ""),
+            event.get("location", ""),
+            color_id,
+            all_day=True,
         )
 
 def add_tasks(payload, service):
@@ -453,14 +527,17 @@ def add_readings(payload, service):
 
 @app.post("/add-events")
 def add_events(payload: dict = Body(...)):
+    print("adding events")
     creds = Credentials.from_authorized_user_file("token.json", SCOPES)
     calendar_service = build("calendar", "v3", credentials=creds)
     tasks_service = build("tasks", "v1", credentials=creds)
-    
-    add_class_schedule(payload, calendar_service)
-    add_calendar_events(payload, calendar_service)
+    color_id = 6
+
+    add_class_schedule(payload, calendar_service, color_id)
+    add_calendar_events(payload, calendar_service, color_id)
     add_tasks(payload, tasks_service)
     add_readings(payload, tasks_service)
+    print("added events successfully")
 
     return {"message": "Events added successfully"}
 
