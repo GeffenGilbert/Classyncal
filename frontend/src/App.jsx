@@ -1,14 +1,37 @@
 // npm run dev
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [backendMessage, setBackendMessage] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [googleAuthMessage, setGoogleAuthMessage] = useState("");
+
+  useEffect(() => {
+    function handleMessage(event) {
+      if (event.origin !== "http://localhost:8000") {
+        return;
+      }
+
+      if (event.data?.type === "google-auth-success") {
+        setGoogleAuthMessage("Google account connected successfully");
+      }
+    }
+
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, []);
 
   function connectGoogle() {
-    window.location.href = "http://localhost:8000/auth/google";
+    window.open(
+      "http://localhost:8000/auth/google",
+      "google-auth-popup",
+      "width=500,height=700"
+    );
   }
 
   async function callBackend() {
@@ -50,6 +73,8 @@ function App() {
   }
 
   async function addEvents() {
+    console.log("Calling add_events");
+
     if (!backendMessage) {
       console.error("Error: No backend message available to send")
       return;
@@ -147,6 +172,8 @@ function App() {
           <DisplayTasks />
         </div>
       )}
+
+      {googleAuthMessage && <p>{googleAuthMessage}</p>}
 
       <button onClick={uploadFile}>Upload File</button>
       <div>
