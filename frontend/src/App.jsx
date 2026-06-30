@@ -49,6 +49,30 @@ function App() {
     console.log("retrieved backend message");
   }
 
+  async function addEvents() {
+    if (!backendMessage) {
+      console.error("Error: No backend message available to send")
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:8000/add-events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(backendMessage),
+      });
+
+      const data = await response.json();
+      console.log(data);
+      setBackendMessage(data.message);
+    } catch (error) {
+      console.error("Error sending events to backend:", error);
+      setErrorMessage("Could not send extracted events to backend");
+    }
+  }
+
   // async function uploadFile() {
   //   const response = await fetch("http://localhost:8000/test-openai");
   //   const data = await response.json();
@@ -128,8 +152,11 @@ function App() {
       <div>
         <button onClick={connectGoogle}>Connect Google</button>
       </div>
-      <div>
+      {/* <div>
         <button onClick={addEvent}>Test Calendar</button>
+      </div> */}
+      <div>
+        <button onClick={addEvents}>Add Events</button>
       </div>
     </div>
   );
