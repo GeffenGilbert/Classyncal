@@ -1,7 +1,8 @@
 const STEPS = [
   "Upload your syllabus",
   "Review and edit the details",
-  "Add it to your calendar",
+  "Sign into your Google account", 
+  "Watch as everything automatically gets added to your Google Calendar", 
 ];
 
 function HowItWorks() {

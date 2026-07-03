@@ -15,6 +15,19 @@ body {
   @apply bg-slate-50 text-slate-900 font-sans antialiased;
 }
 
+/* Chrome pads its date/time picker icons well away from the value by
+   default; trim that so each icon sits close to its text. Tuned
+   separately since the two icons don't have the same built-in spacing. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  margin-left: -14px;
+  padding: 0;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+  margin-left: 6px;
+  padding: 0;
+}
+
 @keyframes fade-out-square {
   0% {
     opacity: 0.5;

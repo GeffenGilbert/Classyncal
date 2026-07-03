@@ -15,6 +15,7 @@ import json
 
 from fastapi.responses import RedirectResponse
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -528,10 +529,17 @@ def add_readings(payload, service):
 @app.post("/add-events")
 def add_events(payload: dict = Body(...)):
     print("adding events")
+
+    if not os.path.exists("token.json"):
+        return JSONResponse(
+            status_code=401,
+            content={"error": "not_authenticated", "message": "Google account not connected"},
+        )
+
     creds = Credentials.from_authorized_user_file("token.json", SCOPES)
     calendar_service = build("calendar", "v3", credentials=creds)
     tasks_service = build("tasks", "v1", credentials=creds)
-    color_id = 6
+    color_id = payload.get("color_id", 1)
 
     add_class_schedule(payload, calendar_service, color_id)
     add_calendar_events(payload, calendar_service, color_id)
