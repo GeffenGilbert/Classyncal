@@ -10,7 +10,7 @@ function DueItemsTab({ items, path, onUpdate, onRemove, onAdd, addLabel }) {
   return (
     <div className="flex flex-col">
       {items.map((item, index) => (
-        <ItemRow key={index} onRemove={() => onRemove(path, index)}>
+        <ItemRow key={item._key} onRemove={() => onRemove(path, index)}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <EditableField
               className="col-span-2 sm:col-span-4 font-medium"

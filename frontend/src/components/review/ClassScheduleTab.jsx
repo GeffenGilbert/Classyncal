@@ -19,7 +19,7 @@ function ClassScheduleTab({ meetings, onUpdate, onRemove, onAdd }) {
     <div className="flex flex-col">
       {meetings.map((meeting, index) => (
         <ItemRow
-          key={index}
+          key={meeting._key}
           onRemove={() => onRemove("class_schedule.meetings", index)}
         >
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

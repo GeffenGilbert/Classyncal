@@ -16,7 +16,7 @@ function EventsTab({ events, onUpdate, onRemove, onAdd }) {
   return (
     <div className="flex flex-col">
       {events.map((event, index) => (
-        <ItemRow key={index} onRemove={() => onRemove("calendar_events", index)}>
+        <ItemRow key={event._key} onRemove={() => onRemove("calendar_events", index)}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <EditableField
               className="col-span-2 sm:col-span-4 font-medium"

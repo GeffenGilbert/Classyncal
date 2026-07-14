@@ -3,12 +3,27 @@ import { UploadCloud, FileText } from "lucide-react";
 import ReviewModal from "./review/ReviewModal";
 import TEST_SAMPLE_DATA from "../_testSampleData.json";
 
+// Item arrays come straight from the backend with no stable id, but React
+// list rendering needs one that survives removals — using array index as a
+// key makes a component get reused for a different item once an earlier one
+// is removed, leaking that component's local state onto the wrong row.
+function withStableKeys(data) {
+  const addKeys = (items) => items.map((item) => ({ ...item, _key: crypto.randomUUID() }));
+  return {
+    ...data,
+    class_schedule: { ...data.class_schedule, meetings: addKeys(data.class_schedule.meetings) },
+    calendar_events: addKeys(data.calendar_events),
+    tasks: addKeys(data.tasks),
+    readings: addKeys(data.readings),
+  };
+}
+
 function SyllabusUploader() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [extractedData, setExtractedData] = useState(TEST_SAMPLE_DATA);
+  const [extractedData, setExtractedData] = useState(() => withStableKeys(TEST_SAMPLE_DATA));
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [addToCalendarError, setAddToCalendarError] = useState("");
   const [justAddedToCalendar, setJustAddedToCalendar] = useState(false);
@@ -66,7 +81,7 @@ function SyllabusUploader() {
         body: formData,
       });
       const data = await response.json();
-      setExtractedData(data);
+      setExtractedData(withStableKeys(data));
     } catch (error) {
       console.error("Error uploading syllabus:", error);
       setUploadError("Could not upload your syllabus. Please try again.");

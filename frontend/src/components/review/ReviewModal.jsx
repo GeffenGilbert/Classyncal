@@ -65,7 +65,9 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   }
 
   function addItem(path, blank) {
-    onChange((prev) => setIn(prev, path, [...getIn(prev, path), blank]));
+    onChange((prev) =>
+      setIn(prev, path, [...getIn(prev, path), { ...blank, _key: crypto.randomUUID() }]),
+    );
   }
 
   function updateCourse(field, value) {
@@ -104,10 +106,17 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   function handleConfirm() {
     let payload = data;
     for (const tabId of Object.keys(TAB_DATA_PATHS)) {
-      if (!selectedTabs.has(tabId)) {
-        for (const path of TAB_DATA_PATHS[tabId]) {
-          payload = setIn(payload, path, []);
-        }
+      for (const path of TAB_DATA_PATHS[tabId]) {
+        const items = selectedTabs.has(tabId) ? getIn(payload, path) : [];
+        payload = setIn(
+          payload,
+          path,
+          items.map((item) => {
+            const clean = { ...item };
+            delete clean._key;
+            return clean;
+          }),
+        );
       }
     }
     onConfirm({ ...payload, color_id: colorId });
@@ -159,7 +168,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
         {step === "select" && (
           <div className="flex-1 overflow-y-auto p-6">
             <p className="mb-4 text-sm text-slate-500">
-              Choose which categories you&apos;d like to review and add to your calendar.
+              Choose which categories you&apos;d like to add to your calendar.
             </p>
             <div className="flex flex-col gap-2">
               {availableTabs.map((tab) => {
