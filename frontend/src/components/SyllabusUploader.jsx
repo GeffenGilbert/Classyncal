@@ -1,18 +1,75 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { UploadCloud, FileText } from "lucide-react";
 import ReviewModal from "./review/ReviewModal";
+import TEST_SAMPLE_DATA from "../_testSampleData.json";
+
+// Item arrays come straight from the backend with no stable id, but React
+// list rendering needs one that survives removals — using array index as a
+// key makes a component get reused for a different item once an earlier one
+// is removed, leaking that component's local state onto the wrong row.
+function withStableKeys(data) {
+  const addKeys = (items) => items.map((item) => ({ ...item, _key: crypto.randomUUID() }));
+  return {
+    ...data,
+    class_schedule: { ...data.class_schedule, meetings: addKeys(data.class_schedule.meetings) },
+    calendar_events: addKeys(data.calendar_events),
+    tasks: addKeys(data.tasks),
+    readings: addKeys(data.readings),
+  };
+}
 
 function SyllabusUploader() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [extractedData, setExtractedData] = useState(null);
+  const [extractedData, setExtractedData] = useState(() => withStableKeys(TEST_SAMPLE_DATA));
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [addToCalendarError, setAddToCalendarError] = useState("");
   const [justAddedToCalendar, setJustAddedToCalendar] = useState(false);
   const fileInputRef = useRef(null);
   const pendingPayloadRef = useRef(null);
+
+  function connectGoogleAndRetry(payload) {
+    pendingPayloadRef.current = payload;
+    window.open(
+      "http://localhost:8000/auth/google",
+      "google-auth-popup",
+      "width=500,height=700"
+    );
+  }
+
+  const addToCalendar = useCallback(async (payload) => {
+    setIsAddingToCalendar(true);
+    setAddToCalendarError("");
+
+    try {
+      const response = await fetch("http://localhost:8000/add-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status === 401) {
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.error === "not_authenticated") {
+          connectGoogleAndRetry(payload);
+          return;
+        }
+      }
+
+      if (!response.ok) throw new Error("Request failed");
+
+      setExtractedData(null);
+      setSelectedFile(null);
+      setJustAddedToCalendar(true);
+    } catch (error) {
+      console.error("Error adding events to calendar:", error);
+      setAddToCalendarError("Could not add these events to your calendar. Please try again.");
+    } finally {
+      setIsAddingToCalendar(false);
+    }
+  }, []);
 
   useEffect(() => {
     function handleMessage(event) {
@@ -26,16 +83,7 @@ function SyllabusUploader() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  function connectGoogleAndRetry(payload) {
-    pendingPayloadRef.current = payload;
-    window.open(
-      "http://localhost:8000/auth/google",
-      "google-auth-popup",
-      "width=500,height=700"
-    );
-  }
+  }, [addToCalendar]);
 
   function handleFiles(files) {
     const file = files?.[0];
@@ -65,44 +113,12 @@ function SyllabusUploader() {
         body: formData,
       });
       const data = await response.json();
-      setExtractedData(data);
+      setExtractedData(withStableKeys(data));
     } catch (error) {
       console.error("Error uploading syllabus:", error);
       setUploadError("Could not upload your syllabus. Please try again.");
     } finally {
       setIsUploading(false);
-    }
-  }
-
-  async function addToCalendar(payload) {
-    setIsAddingToCalendar(true);
-    setAddToCalendarError("");
-
-    try {
-      const response = await fetch("http://localhost:8000/add-events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.status === 401) {
-        const errorData = await response.json().catch(() => ({}));
-        if (errorData.error === "not_authenticated") {
-          connectGoogleAndRetry(payload);
-          return;
-        }
-      }
-
-      if (!response.ok) throw new Error("Request failed");
-
-      setExtractedData(null);
-      setSelectedFile(null);
-      setJustAddedToCalendar(true);
-    } catch (error) {
-      console.error("Error adding events to calendar:", error);
-      setAddToCalendarError("Could not add these events to your calendar. Please try again.");
-    } finally {
-      setIsAddingToCalendar(false);
     }
   }
 
