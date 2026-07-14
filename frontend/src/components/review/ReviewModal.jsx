@@ -33,9 +33,24 @@ const TAB_DATA_PATHS = {
 };
 
 function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitError }) {
-  const [activeTab, setActiveTab] = useState("schedule");
-  const [disabledTabs, setDisabledTabs] = useState(() => new Set());
+  const tabs = [
+    { id: "schedule", label: "Class Schedule", count: data.class_schedule.meetings.length },
+    { id: "events", label: "Events", count: data.calendar_events.length },
+    { id: "tasks", label: "Tasks", count: data.tasks.length },
+    { id: "readings", label: "Readings", count: data.readings.length },
+  ];
+  // Categories with nothing extracted have nothing to select or review.
+  const availableTabs = tabs.filter((tab) => tab.count > 0);
+
+  const [step, setStep] = useState("select");
+  const [selectedTabs, setSelectedTabs] = useState(
+    () => new Set(availableTabs.map((tab) => tab.id)),
+  );
   const [colorId, setColorId] = useState(DEFAULT_COLOR_ID);
+
+  // Ordered list of the categories the user opted into, one per review step.
+  const reviewSteps = availableTabs.filter((tab) => selectedTabs.has(tab.id));
+  const currentTab = typeof step === "number" ? reviewSteps[step] : null;
 
   function updateItem(path, index, field, value) {
     onChange((prev) => {
@@ -50,49 +65,70 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   }
 
   function addItem(path, blank) {
-    onChange((prev) => setIn(prev, path, [...getIn(prev, path), blank]));
+    onChange((prev) =>
+      setIn(prev, path, [...getIn(prev, path), { ...blank, _key: crypto.randomUUID() }]),
+    );
   }
 
   function updateCourse(field, value) {
     onChange((prev) => ({ ...prev, course: { ...prev.course, [field]: value } }));
   }
 
-  function toggleTabDisabled(tabId) {
-    setDisabledTabs((prev) => {
+  function toggleTabSelected(tabId) {
+    setSelectedTabs((prev) => {
       const next = new Set(prev);
       if (next.has(tabId)) {
         next.delete(tabId);
       } else {
         next.add(tabId);
-        if (activeTab === tabId) {
-          const fallback = tabs.find((tab) => tab.id !== tabId && !next.has(tab.id));
-          if (fallback) setActiveTab(fallback.id);
-        }
       }
       return next;
     });
   }
 
+  function handleNext() {
+    if (reviewSteps.length === 0) return;
+    setStep(0);
+  }
+
+  function handleBackFromReview() {
+    setStep(step === 0 ? "select" : step - 1);
+  }
+
+  function handleNextFromReview() {
+    setStep(step === reviewSteps.length - 1 ? "colors" : step + 1);
+  }
+
+  function handleBackFromColors() {
+    setStep(reviewSteps.length - 1);
+  }
+
   function handleConfirm() {
     let payload = data;
-    for (const tabId of disabledTabs) {
+    for (const tabId of Object.keys(TAB_DATA_PATHS)) {
       for (const path of TAB_DATA_PATHS[tabId]) {
-        payload = setIn(payload, path, []);
+        const items = selectedTabs.has(tabId) ? getIn(payload, path) : [];
+        payload = setIn(
+          payload,
+          path,
+          items.map((item) => {
+            const clean = { ...item };
+            delete clean._key;
+            return clean;
+          }),
+        );
       }
     }
     onConfirm({ ...payload, color_id: colorId });
   }
 
-  const tabs = [
-    { id: "schedule", label: "Class Schedule", count: data.class_schedule.meetings.length },
-    { id: "events", label: "Events", count: data.calendar_events.length },
-    { id: "tasks", label: "Tasks", count: data.tasks.length },
-    { id: "readings", label: "Readings", count: data.readings.length },
-  ];
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
+      <div
+        className={`flex w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl ${
+          currentTab ? "h-[85vh]" : "max-h-[85vh]"
+        }`}
+      >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-6">
           <div className="flex flex-1 flex-col gap-2">
             <EditableField
@@ -129,90 +165,103 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
           </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-between border-b border-slate-200 px-6">
-          <div className="flex gap-1">
-            {tabs.map((tab) => {
-              const isDisabled = disabledTabs.has(tab.id);
-              return (
-                <div
-                  key={tab.id}
-                  className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                    isDisabled
-                      ? "border-transparent text-slate-300"
-                      : activeTab === tab.id
-                        ? "border-indigo-500 text-indigo-600"
-                        : "border-transparent text-slate-500 hover:text-slate-700"
-                  }`}
-                >
+        {step === "select" && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <p className="mb-4 text-sm text-slate-500">
+              Choose which categories you&apos;d like to add to your calendar.
+            </p>
+            <div className="flex flex-col gap-2">
+              {availableTabs.map((tab) => {
+                const isSelected = selectedTabs.has(tab.id);
+                return (
                   <button
+                    key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    disabled={isDisabled}
-                    className={isDisabled ? "cursor-not-allowed line-through" : ""}
-                  >
-                    {tab.label} ({tab.count})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleTabDisabled(tab.id)}
-                    aria-label={isDisabled ? `Enable ${tab.label}` : `Disable ${tab.label}`}
-                    className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
-                      isDisabled
-                        ? "border-slate-300 bg-white"
-                        : "border-indigo-500 bg-indigo-500"
+                    onClick={() => toggleTabSelected(tab.id)}
+                    className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors ${
+                      isSelected
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-slate-200 hover:border-slate-300"
                     }`}
                   >
-                    {!isDisabled && <Check className="h-3 w-3 text-white" />}
+                    <span className="text-sm font-medium text-slate-700">
+                      {tab.label} <span className="text-slate-400">({tab.count})</span>
+                    </span>
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
+                        isSelected
+                          ? "border-indigo-500 bg-indigo-500"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
+                    </span>
                   </button>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
+        )}
 
-          <ColorPicker value={colorId} onChange={setColorId} />
-        </div>
+        {currentTab && (
+          <>
+            <div className="mt-4 border-b border-slate-200 px-6 pb-3">
+              <p className="text-sm font-medium text-slate-500">
+                Review and Edit the <span className="font-bold">{currentTab.label}</span> to Your Preferences
+              </p>
+            </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          {activeTab === "schedule" && (
-            <ClassScheduleTab
-              meetings={data.class_schedule.meetings}
-              onUpdate={updateItem}
-              onRemove={removeItem}
-              onAdd={addItem}
-            />
-          )}
-          {activeTab === "events" && (
-            <EventsTab
-              events={data.calendar_events}
-              onUpdate={updateItem}
-              onRemove={removeItem}
-              onAdd={addItem}
-            />
-          )}
-          {activeTab === "tasks" && (
-            <DueItemsTab
-              items={data.tasks}
-              path="tasks"
-              addLabel="Add task"
-              onUpdate={updateItem}
-              onRemove={removeItem}
-              onAdd={addItem}
-            />
-          )}
-          {activeTab === "readings" && (
-            <DueItemsTab
-              items={data.readings}
-              path="readings"
-              addLabel="Add reading"
-              onUpdate={updateItem}
-              onRemove={removeItem}
-              onAdd={addItem}
-            />
-          )}
-        </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {currentTab.id === "schedule" && (
+                <ClassScheduleTab
+                  meetings={data.class_schedule.meetings}
+                  onUpdate={updateItem}
+                  onRemove={removeItem}
+                  onAdd={addItem}
+                />
+              )}
+              {currentTab.id === "events" && (
+                <EventsTab
+                  events={data.calendar_events}
+                  onUpdate={updateItem}
+                  onRemove={removeItem}
+                  onAdd={addItem}
+                />
+              )}
+              {currentTab.id === "tasks" && (
+                <DueItemsTab
+                  items={data.tasks}
+                  path="tasks"
+                  addLabel="Add task"
+                  onUpdate={updateItem}
+                  onRemove={removeItem}
+                  onAdd={addItem}
+                />
+              )}
+              {currentTab.id === "readings" && (
+                <DueItemsTab
+                  items={data.readings}
+                  path="readings"
+                  addLabel="Add reading"
+                  onUpdate={updateItem}
+                  onRemove={removeItem}
+                  onAdd={addItem}
+                />
+              )}
+            </div>
+          </>
+        )}
 
-        <div className="flex items-center justify-end gap-3 border-t border-slate-200 p-6">
-          {submitError && <p className="mr-auto text-sm text-red-500">{submitError}</p>}
+        {step === "colors" && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <p className="mb-4 text-sm text-slate-500">
+              Pick a <span className="font-bold">calendar color</span> for the events.
+            </p>
+            <ColorPicker value={colorId} onChange={setColorId} />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t border-slate-200 p-6">
           <button
             type="button"
             onClick={onClose}
@@ -220,14 +269,56 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={isSubmitting}
-            className="rounded-lg bg-indigo-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSubmitting ? "Adding to Calendar..." : "Add to Calendar"}
-          </button>
+          <div className="flex items-center gap-3">
+            {submitError && <p className="text-sm text-red-500">{submitError}</p>}
+            {step === "select" && (
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={selectedTabs.size === 0}
+                className="rounded-lg bg-indigo-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Next
+              </button>
+            )}
+            {currentTab && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBackFromReview}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextFromReview}
+                  className="rounded-lg bg-indigo-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
+                >
+                  Next
+                </button>
+              </>
+            )}
+            {step === "colors" && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBackFromColors}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={isSubmitting}
+                  className="rounded-lg bg-indigo-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSubmitting ? "Adding to Calendar..." : "Add to Calendar"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
