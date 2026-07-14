@@ -7,7 +7,7 @@ function ItemRow({ onRemove, children }) {
         type="button"
         onClick={onRemove}
         aria-label="Remove"
-        className="absolute right-3 top-3 text-slate-300 transition-colors hover:text-red-500"
+        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-red-100 hover:text-red-500"
       >
         <X className="h-4 w-4" />
       </button>
