@@ -1,5 +1,5 @@
 const BASE_CLASS =
-  "rounded border border-transparent bg-transparent px-1.5 py-1 text-sm text-slate-900 transition-colors hover:border-slate-200 focus:border-indigo-400 focus:bg-white focus:outline-none";
+  "rounded border border-dashed border-slate-300 bg-transparent px-1.5 py-1 text-sm text-slate-900 transition-colors hover:border-slate-400 focus:border-solid focus:border-indigo-400 focus:bg-white focus:outline-none";
 
 // Date/time inputs shrink to fit their content so the browser's picker icon
 // sits right next to the typed value instead of at the far edge of a

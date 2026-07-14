@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { UploadCloud, FileText } from "lucide-react";
 import ReviewModal from "./review/ReviewModal";
+import TEST_SAMPLE_DATA from "../_testSampleData.json";
 
 function SyllabusUploader() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [extractedData, setExtractedData] = useState(null);
+  const [extractedData, setExtractedData] = useState(TEST_SAMPLE_DATA);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [addToCalendarError, setAddToCalendarError] = useState("");
   const [justAddedToCalendar, setJustAddedToCalendar] = useState(false);
