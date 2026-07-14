@@ -14,7 +14,7 @@ const BLANK_EVENT = {
 
 function EventsTab({ events, onUpdate, onRemove, onAdd }) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {events.map((event, index) => (
         <ItemRow key={index} onRemove={() => onRemove("calendar_events", index)}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

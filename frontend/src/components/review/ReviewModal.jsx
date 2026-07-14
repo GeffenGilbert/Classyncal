@@ -246,7 +246,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
         {step === "colors" && (
           <div className="flex-1 overflow-y-auto p-6">
             <p className="mb-4 text-sm text-slate-500">
-              Pick a calendar color for these events.
+              Pick a <span className="font-bold">calendar color</span> for the events.
             </p>
             <ColorPicker value={colorId} onChange={setColorId} />
           </div>

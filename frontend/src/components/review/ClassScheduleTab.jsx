@@ -16,7 +16,7 @@ const BLANK_MEETING = {
 
 function ClassScheduleTab({ meetings, onUpdate, onRemove, onAdd }) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {meetings.map((meeting, index) => (
         <ItemRow
           key={index}
