@@ -3,6 +3,13 @@ import { UploadCloud, FileText } from "lucide-react";
 import ReviewModal from "./review/ReviewModal";
 import UploadingScreen from "./UploadingScreen";
 
+const ALLOWED_FILE_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "image/png",
+  "image/jpeg", // covers both .jpg and .jpeg
+];
+
 // Item arrays come straight from the backend with no stable id, but React
 // list rendering needs one that survives removals — using array index as a
 // key makes a component get reused for a different item once an earlier one
@@ -87,7 +94,7 @@ function SyllabusUploader() {
 
   function handleFiles(files) {
     const file = files?.[0];
-    if (!file || file.type !== "application/pdf") return;
+    if (!file || !ALLOWED_FILE_TYPES.includes(file.type)) return;
     setSelectedFile(file);
     setUploadError("");
     setJustAddedToCalendar(false);
@@ -156,7 +163,7 @@ function SyllabusUploader() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf"
+            accept={ALLOWED_FILE_TYPES.join(",")}
             className="hidden"
             onChange={(event) => handleFiles(event.target.files)}
           />
@@ -176,9 +183,11 @@ function SyllabusUploader() {
               <UploadCloud className="h-10 w-10 text-slate-400" />
               <div>
                 <p className="font-medium text-slate-900">
-                  Drag & drop your syllabus PDF here
+                  Drag & drop your syllabus here
                 </p>
-                <p className="mt-1 text-sm text-slate-500">or click to browse</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  or click to browse
+                </p>
               </div>
             </>
           )}

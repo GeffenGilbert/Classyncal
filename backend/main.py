@@ -12,6 +12,8 @@ import base64
 from openai import OpenAI
 
 import json
+import io
+from docx import Document
 
 from fastapi.responses import RedirectResponse
 from fastapi.responses import HTMLResponse
@@ -125,13 +127,68 @@ def test_calendar():
     service.events().insert(calendarId="primary", body=event).execute()
     return {"message": "Event added"}
 
+DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+ALLOWED_CONTENT_TYPES = {
+    "application/pdf",
+    DOCX_CONTENT_TYPE,
+    "image/png",
+    "image/jpeg",  # covers both .jpg and .jpeg
+}
+
+def _table_to_markdown(rows):
+    rows = [row for row in rows if row]
+    if not rows:
+        return ""
+    def format_row(row):
+        cells = [str(cell).strip() if cell is not None else "" for cell in row]
+        return "| " + " | ".join(cells) + " |"
+    lines = [format_row(rows[0]), "| " + " | ".join(["---"] * len(rows[0])) + " |"]
+    lines.extend(format_row(row) for row in rows[1:])
+    return "\n".join(lines)
+
+# docx is a structured XML format (not a rendering-only format like PDF), so
+# extracting its text/tables locally is reliable and there's no accuracy
+# tradeoff to weigh here the way there was for PDF.
+def extract_docx_text(contents: bytes):
+    doc = Document(io.BytesIO(contents))
+    parts = [para.text for para in doc.paragraphs if para.text.strip()]
+    for table in doc.tables:
+        rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+        markdown = _table_to_markdown(rows)
+        if markdown:
+            parts.append(f"[Table]\n{markdown}")
+    return "\n\n".join(parts)
+
 @app.post("/upload-syllabus")
 async def upload_syllabus(file: UploadFile = File(...)):
-    if file.content_type != "application/pdf":
-        return {"error": "Only PDF files are supported for now"}
-    
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        return {"error": "Unsupported file type. Please upload a PDF, DOCX, PNG, or JPG."}
+
     contents = await file.read()
-    base64_pdf = base64.b64encode(contents).decode("utf-8")
+
+    if file.content_type == "application/pdf":
+        base64_pdf = base64.b64encode(contents).decode("utf-8")
+        document_content = {
+            "type": "input_file",
+            "filename": file.filename,
+            "file_data": f"data:application/pdf;base64,{base64_pdf}",
+        }
+    elif file.content_type == DOCX_CONTENT_TYPE:
+        try:
+            extracted_text = extract_docx_text(contents)
+        except Exception:
+            return {"error": "Could not read this DOCX file. Please check it isn't corrupted."}
+        document_content = {
+            "type": "input_text",
+            "text": f"Here is the text extracted from the syllabus document, including any tables converted to markdown:\n\n{extracted_text}",
+        }
+    else:
+        base64_image = base64.b64encode(contents).decode("utf-8")
+        document_content = {
+            "type": "input_image",
+            "image_url": f"data:{file.content_type};base64,{base64_image}",
+        }
 
     client = OpenAI(
         api_key=api_key
@@ -144,7 +201,7 @@ async def upload_syllabus(file: UploadFile = File(...)):
         """
             You are a syllabus extraction assistant for a college calendar app.
 
-            Your job is to read a college syllabus PDF and extract structured scheduling information.
+            Your job is to read a college syllabus and extract structured scheduling information.
 
             You must separate:
             1. recurring class meeting schedules,
@@ -161,16 +218,12 @@ async def upload_syllabus(file: UploadFile = File(...)):
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "input_file",
-                        "filename": file.filename,
-                        "file_data": f"data:application/pdf;base64,{base64_pdf}",
-                    },
+                    document_content,
                     {
                         "type": "input_text",
-                        "text": 
+                        "text":
                         """
-                            Read this syllabus PDF and extract information for a calendar/task app.
+                            Read this syllabus and extract information for a calendar/task app.
 
                             Return only valid JSON in exactly this structure:
 
