@@ -278,13 +278,6 @@ async def upload_syllabus(file: UploadFile = File(...)):
         ],
     )
 
-    # returning_message = {
-    #     "course_code": response.course.course_code, 
-    #     "class_schedule": response.class_schedule, 
-    #     "calendar_events": response.calendar_events, 
-    #     "tasks": response.tasks
-    # }
-
     print("sending response")
 
     return json.loads(response.output_text)
