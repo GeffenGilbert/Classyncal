@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { UploadCloud, FileText } from "lucide-react";
 import ReviewModal from "./review/ReviewModal";
-import TEST_SAMPLE_DATA from "../_testSampleData.json";
 
 // Item arrays come straight from the backend with no stable id, but React
 // list rendering needs one that survives removals — using array index as a
@@ -23,7 +22,7 @@ function SyllabusUploader() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [extractedData, setExtractedData] = useState(() => withStableKeys(TEST_SAMPLE_DATA));
+  const [extractedData, setExtractedData] = useState(null);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [addToCalendarError, setAddToCalendarError] = useState("");
   const [justAddedToCalendar, setJustAddedToCalendar] = useState(false);
