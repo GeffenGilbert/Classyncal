@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { UploadCloud, FileText } from "lucide-react";
 import ReviewModal from "./review/ReviewModal";
 import UploadingScreen from "./UploadingScreen";
+import TEST_SAMPLE_DATA from "../_testSampleData.json";
 
 const ALLOWED_FILE_TYPES = [
   "application/pdf",
@@ -30,7 +31,7 @@ function SyllabusUploader() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [extractedData, setExtractedData] = useState(null);
+  const [extractedData, setExtractedData] = useState(() => withStableKeys(TEST_SAMPLE_DATA));
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
   const [addToCalendarError, setAddToCalendarError] = useState("");
   const [justAddedToCalendar, setJustAddedToCalendar] = useState(false);

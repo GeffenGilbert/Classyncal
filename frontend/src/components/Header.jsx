@@ -5,7 +5,7 @@ function Header() {
         C
       </div>
       <span className="text-lg font-medium tracking-tight text-slate-900">
-        Company Name
+        SyllaSync
       </span>
     </header>
   );
