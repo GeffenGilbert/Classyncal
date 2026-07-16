@@ -40,7 +40,13 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
     { id: "readings", label: "Readings", count: data.readings.length },
   ];
   // Categories with nothing extracted have nothing to select or review.
-  const availableTabs = tabs.filter((tab) => tab.count > 0);
+  // Captured once on mount so a category doesn't vanish from the selection
+  // screen just because the user emptied it out while reviewing — live
+  // counts still show (e.g. "Readings (0)"), the category just stays listed.
+  const [availableTabIds] = useState(
+    () => new Set(tabs.filter((tab) => tab.count > 0).map((tab) => tab.id)),
+  );
+  const availableTabs = tabs.filter((tab) => availableTabIds.has(tab.id));
 
   const [step, setStep] = useState("select");
   const [selectedTabs, setSelectedTabs] = useState(
@@ -49,7 +55,10 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   const [colorId, setColorId] = useState(DEFAULT_COLOR_ID);
 
   // Ordered list of the categories the user opted into, one per review step.
-  const reviewSteps = availableTabs.filter((tab) => selectedTabs.has(tab.id));
+  // Deliberately not filtered by live count: a category the user selected
+  // must stay in the sequence even if they remove every item in it while
+  // reviewing, otherwise the step index would point past the shrunk list.
+  const reviewSteps = tabs.filter((tab) => selectedTabs.has(tab.id));
   const currentTab = typeof step === "number" ? reviewSteps[step] : null;
 
   function updateItem(path, index, field, value) {
