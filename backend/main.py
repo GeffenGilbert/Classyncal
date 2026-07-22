@@ -6,14 +6,19 @@ from fastapi import FastAPI, UploadFile, File, Body
 from fastapi.middleware.cors import CORSMiddleware
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-import base64
+load_dotenv(Path(__file__).with_name(".env"))
+
 from openai import OpenAI
 
-import json
+import base64
 import io
+from typing import Literal
+
 from docx import Document
+from pydantic import BaseModel
 
 from fastapi.responses import RedirectResponse
 from fastapi.responses import HTMLResponse
@@ -25,8 +30,13 @@ from fastapi import Request
 
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1" # this is for local testing, delete before putting on the cloud
 
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
+# CHANGE: Keep production extraction on one default model. These env vars are
+# the only knobs needed to swap models or PDF rendering detail later.
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano")
+OPENAI_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT")
+OPENAI_PDF_DETAIL = os.getenv("OPENAI_PDF_DETAIL", "auto")
+MAX_DOCUMENT_CHARS = int(os.getenv("MAX_DOCUMENT_CHARS", "600000"))
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
@@ -132,9 +142,110 @@ DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessin
 ALLOWED_CONTENT_TYPES = {
     "application/pdf",
     DOCX_CONTENT_TYPE,
-    "image/png",
-    "image/jpeg",  # covers both .jpg and .jpeg
 }
+
+Confidence = Literal["high", "medium", "low"]
+
+# CHANGE: Structured Outputs schema replaces hand-parsed JSON text so the
+# model response must match the shape the review UI expects.
+class Course(BaseModel):
+    course_name: str | None
+    course_code: str | None
+    instructor: str | None
+    term: str | None
+
+class ClassMeeting(BaseModel):
+    title: str
+    days_of_week: list[Literal[
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]]
+    start_time: str | None
+    end_time: str | None
+    location: str | None
+    start_date: str | None
+    end_date: str | None
+    confidence: Confidence
+    source_text: str
+
+class ClassSchedule(BaseModel):
+    found: bool
+    notes: str
+    meetings: list[ClassMeeting]
+
+class ClassCancellation(BaseModel):
+    title: str
+    date: str | None
+    reason: str | None
+    description: str
+    confidence: Confidence
+    source_text: str
+
+class CalendarEvent(BaseModel):
+    title: str
+    event_type: Literal[
+        "exam",
+        "quiz",
+        "final_exam",
+        "presentation",
+        "review_session",
+        "special_class",
+        "other",
+    ]
+    date: str | None
+    start_time: str | None
+    end_time: str | None
+    location: str | None
+    description: str
+    confidence: Confidence
+    source_text: str
+
+class Task(BaseModel):
+    title: str
+    task_type: Literal[
+        "homework",
+        "assignment",
+        "paper",
+        "project",
+        "lab",
+        "problem_set",
+        "other",
+    ]
+    due_date: str | None
+    due_time: str | None
+    description: str
+    confidence: Confidence
+    source_text: str
+
+class Reading(BaseModel):
+    title: str
+    reading_type: Literal["textbook", "article", "class_notes", "book", "other"]
+    due_date: str | None
+    due_time: str | None
+    description: str
+    confidence: Confidence
+    source_text: str
+
+class SyllabusExtraction(BaseModel):
+    course: Course
+    class_schedule: ClassSchedule
+    class_cancellations: list[ClassCancellation]
+    calendar_events: list[CalendarEvent]
+    tasks: list[Task]
+    readings: list[Reading]
+    missing_information: list[str]
+    warnings: list[str]
+
+def error_response(status_code, error, message):
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": error, "message": message},
+    )
 
 def _table_to_markdown(rows):
     rows = [row for row in rows if row]
@@ -160,180 +271,147 @@ def extract_docx_text(contents: bytes):
             parts.append(f"[Table]\n{markdown}")
     return "\n\n".join(parts)
 
+def truncate_document_text(text):
+    if len(text) <= MAX_DOCUMENT_CHARS:
+        return text
+
+    return (
+        text[:MAX_DOCUMENT_CHARS]
+        + "\n\n[Document truncated because it exceeded the configured prompt size safety limit.]"
+    )
+
+def make_pdf_input_content(filename, contents):
+    base64_pdf = base64.b64encode(contents).decode("utf-8")
+    return [
+        {
+            "type": "input_file",
+            "filename": filename or "syllabus.pdf",
+            "file_data": f"data:application/pdf;base64,{base64_pdf}",
+            "detail": OPENAI_PDF_DETAIL,
+        },
+        {
+            "type": "input_text",
+            "text": (
+                "Read this syllabus PDF and extract structured calendar/task data. "
+                "Use both the PDF text and page images. If the PDF includes scans, tables, "
+                "or unusual formatting, inspect the visible page content rather than returning an error."
+            ),
+        },
+    ]
+
+def make_text_input_content(document_text):
+    return truncate_document_text(document_text)
+
 @app.post("/upload-syllabus")
 async def upload_syllabus(file: UploadFile = File(...)):
     if file.content_type not in ALLOWED_CONTENT_TYPES:
-        return {"error": "Unsupported file type. Please upload a PDF, DOCX, PNG, or JPG."}
+        return error_response(
+            415,
+            "unsupported_file_type",
+            "Unsupported file type. Please upload a PDF or DOCX file.",
+        )
+
+    if not openai_api_key:
+        return error_response(
+            500,
+            "missing_openai_api_key",
+            "OPENAI_API_KEY is not configured on the backend.",
+        )
 
     contents = await file.read()
 
     if file.content_type == "application/pdf":
-        base64_pdf = base64.b64encode(contents).decode("utf-8")
-        document_content = {
-            "type": "input_file",
-            "filename": file.filename,
-            "file_data": f"data:application/pdf;base64,{base64_pdf}",
-        }
+        # CHANGE: Send PDFs directly to OpenAI so normal or scanned syllabi do
+        # not get blocked by local text-extraction failures.
+        input_content = make_pdf_input_content(file.filename, contents)
     elif file.content_type == DOCX_CONTENT_TYPE:
         try:
             extracted_text = extract_docx_text(contents)
         except Exception:
-            return {"error": "Could not read this DOCX file. Please check it isn't corrupted."}
-        document_content = {
-            "type": "input_text",
-            "text": f"Here is the text extracted from the syllabus document, including any tables converted to markdown:\n\n{extracted_text}",
-        }
-    else:
-        base64_image = base64.b64encode(contents).decode("utf-8")
-        document_content = {
-            "type": "input_image",
-            "image_url": f"data:{file.content_type};base64,{base64_image}",
-        }
+            return error_response(
+                422,
+                "docx_text_extraction_failed",
+                "Could not read this DOCX file. Please check that it is not corrupted.",
+            )
 
-    client = OpenAI(
-        api_key=api_key
-    )
+        if not extracted_text.strip():
+            return error_response(
+                422,
+                "docx_has_no_extractable_text",
+                "Could not find text in this DOCX file.",
+            )
 
-    print("sending to chatgpt")
-    response = client.responses.create(
-        model="gpt-5-mini",
-        instructions=
-        """
-            You are a syllabus extraction assistant for a college calendar app.
+        document_text = f"Here is the text extracted from the syllabus document, including any tables converted to markdown:\n\n{extracted_text}"
+        input_content = make_text_input_content(document_text)
 
-            Your job is to read a college syllabus and extract structured scheduling information.
+    client = OpenAI(api_key=openai_api_key)
 
-            You must separate:
-            1. recurring class meeting schedules,
-            2. one-time calendar events such as exams, quizzes, finals, presentations, and tests,
-            3. task due dates such as homework, assignments, papers, readings, projects, and problem sets.
+    instructions = """You are a syllabus extraction assistant for a college calendar app.
 
-            Do not invent dates, times, titles, or locations.
-            If information is missing or unclear, use null and explain it in missing_information or warnings.
-            Use 24-hour time format for all times.
-            Use ISO date format YYYY-MM-DD for all dates.
-            Return only valid JSON.
-        """,
-        input=[ # review sessions are in calendar events
+Read the full syllabus text and extract structured scheduling information.
+
+You must separate:
+1. recurring class meeting schedules,
+2. one-time calendar events such as exams, quizzes, finals, presentations, and tests,
+3. task due dates such as homework, assignments, papers, labs, projects, and problem sets,
+4. readings,
+5. cancellations such as holidays, breaks, and no-class days.
+
+Rules:
+- Do not invent dates, times, titles, or locations.
+- If information is missing or unclear, use null and explain it in missing_information or warnings.
+- Use 24-hour HH:MM time format for times.
+- Use ISO YYYY-MM-DD format for dates.
+- Class meeting schedules are recurring events, such as "MW 2:00-3:15", "Tues/Thurs 10am", "TR 450pm-605pm", or "every Monday and Wednesday".
+- Put recurring class schedules in class_schedule.meetings, not in calendar_events.
+- Tests, exams, midterms, finals, quizzes, presentations, review sessions, and special class meetings go in calendar_events.
+- Homework, assignments, papers, projects, labs, problem sets, and other graded or submitted work go in tasks.
+- Readings should not go in tasks. Put textbook readings, articles, book chapters, class notes, and other reading assignments in readings.
+- Put "No Class", holidays, breaks, canceled classes, and university closures in class_cancellations, not calendar_events.
+- If a final exam has a date but no time, include the date and set start_time and end_time to null.
+- If class meeting times are not found, set class_schedule.found to false, meetings to [], and add "Class meeting times not found" to missing_information.
+- Do not include events that do not have a date unless they are recurring class meeting schedules.
+- source_text should be a short phrase copied from the syllabus that supports the extracted item.
+- If a reading is listed as TBD, do not include it in readings. Add it to warnings instead.
+- If the syllabus has a dated schedule of class meetings, use the first dated regular class meeting as start_date and the last dated regular class meeting as end_date. Mark confidence as medium if inferred.
+- If an exam, review, quiz, or presentation appears on a regular class meeting day without an explicit time/location, leave start_time, end_time, and location as null.
+- If a task, lab, homework, assignment, reading, or project is listed next to a week range, use the final day of that week range as the due_date. Mention the inference in description and set confidence to medium.
+- For days_of_week, use a flat array of full day names only: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.
+- For class meeting titles, use the course_code followed by the meeting type, such as "CSC 242 Lecture", "CSC 242 Lab", "CSC 242 Recitation", or "CSC 242 Class"."""
+
+    request = {
+        "model": OPENAI_MODEL,
+        "instructions": instructions,
+        "input": [
             {
                 "role": "user",
-                "content": [
-                    document_content,
-                    {
-                        "type": "input_text",
-                        "text":
-                        """
-                            Read this syllabus and extract information for a calendar/task app.
-
-                            Return only valid JSON in exactly this structure:
-
-                            {
-                            "course": {
-                                "course_name": string or null,
-                                "course_code": string or null,
-                                "instructor": string or null,
-                                "term": string or null
-                            },
-                            "class_schedule": {
-                                "found": boolean,
-                                "notes": string,
-                                "meetings": [
-                                {
-                                    "title": string,
-                                    "days_of_week": array of strings,
-                                    "start_time": string or null,
-                                    "end_time": string or null,
-                                    "location": string or null,
-                                    "start_date": string or null,
-                                    "end_date": string or null,
-                                    "confidence": "high" or "medium" or "low",
-                                    "source_text": string
-                                }
-                                ]
-                            },
-                            "class_cancellations": [
-                                {
-                                "title": string,
-                                "date": string or null,
-                                "reason": string or null,
-                                "description": string,
-                                "confidence": "high" or "medium" or "low",
-                                "source_text": string
-                                }
-                            ],
-                            "calendar_events": [
-                                {
-                                "title": string,
-                                "event_type": "exam" or "quiz" or "final_exam" or "presentation" or "review_session" or "special_class" or "other",
-                                "date": string or null,
-                                "start_time": string or null,
-                                "end_time": string or null,
-                                "location": string or null,
-                                "description": string,
-                                "confidence": "high" or "medium" or "low",
-                                "source_text": string
-                                }
-                            ],
-                            "tasks": [
-                                {
-                                "title": string,
-                                "task_type": "homework" or "assignment" or "paper" or "project" or "lab" or "problem_set" or "other",
-                                "due_date": string or null,
-                                "due_time": string or null,
-                                "description": string,
-                                "confidence": "high" or "medium" or "low",
-                                "source_text": string
-                                }
-                            ],
-                            "readings": [
-                                {
-                                "title": string,
-                                "reading_type": "textbook" or "article" or "class_notes" or "book" or "other",
-                                "due_date": string or null,
-                                "due_time": string or null,
-                                "description": string,
-                                "confidence": "high" or "medium" or "low",
-                                "source_text": string
-                                }
-                            ],
-                            "missing_information": array of strings,
-                            "warnings": array of strings
-                            }
-
-                            Extraction rules:
-                            - Class meeting schedules are recurring events, such as "MW 2:00-3:15", "Tues/Thurs 10am", "TR 450pm-605pm", or "every Monday and Wednesday".
-                            - Put recurring class schedules in class_schedule.meetings, not in calendar_events.
-                            - Tests, exams, midterms, finals, quizzes, presentations, review sessions, and special class meetings go in calendar_events.
-                            - Homework, assignments, papers, projects, labs, problem sets, and other graded or submitted work go in tasks.
-                            - Readings should not go in tasks. Put textbook readings, articles, book chapters, class notes, and other reading assignments in readings.
-                            - "No Class", holidays, breaks, spring break, fall break, canceled classes, and university closures should not go in calendar_events.
-                            - Put "No Class", holidays, breaks, canceled classes, and university closures in class_cancellations.
-                            - If a final exam has a date but no time, include the date and set start_time and end_time to null.
-                            - If class meeting times are not found, set class_schedule.found to false, meetings to [], and add "Class meeting times not found" to missing_information.
-                            - If a date is ambiguous, use null for the date and explain the ambiguity in warnings.
-                            - Do not include events that do not have a date unless they are recurring class meeting schedules.
-                            - Do not invent missing information.
-                            - source_text should be a short phrase copied from the syllabus that supports the extracted item.
-                            - If a reading is listed as TBD, do not include it in readings. Add it to warnings instead.
-                            - If the syllabus has a dated schedule of class meetings, use the first dated regular class meeting as class_schedule.meetings[].start_date and the last dated regular class meeting as end_date. Mark confidence as medium if inferred.
-                            - If an exam, review, quiz, or presentation appears on a regular class meeting day without an explicit time/location, leave start_time, end_time, and location as null
-                            - If a task, lab, homework, assignment, reading, or project is listed next to a week range, use the final day of that week range as the due_date.
-                            - Example: "Jan 26 - Feb 1" means due_date is "2026-02-01"
-                            - Example: "Apr 27 - May 3" means due_date is "2026-05-03"
-                            - In the description, mention that the due date was inferred from the end of the listed week range
-                            - Set confidence to "medium" when the due date is inferred from a week range rather than explicitly stated
-                            - For class_schedule.meetings[].days_of_week, always return a flat array of full day names only. Allowed values are "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday". Never return abbreviations like "M", "T", "W", "R", "F", "TR", "MW", or "MWF". For example, if the syllabus says "TR", return ["Tuesday", "Thursday"], not ["TR"] and not [["Tuesday", "Thursday"]].
-                            - For class_schedule.meetings[].title, always use the course_code followed by the meeting type. Examples: "CSC 242 Lecture", "CSC 242 Lab", "CSC 242 Recitation", "CSC 242 Discussion". Do not use only "Lecture" or only the course name. If the meeting type is unclear, use "Class", for example "CSC 242 Class".
-                        """
-                    },
-                ],
+                "content": input_content,
             }
         ],
-    )
+        "text_format": SyllabusExtraction,
+        "prompt_cache_key": "syllabus-extraction-v1",
+    }
+    if OPENAI_REASONING_EFFORT:
+        request["reasoning"] = {"effort": OPENAI_REASONING_EFFORT}
 
-    print("sending response")
+    try:
+        response = client.responses.parse(**request)
+    except Exception:
+        return error_response(
+            502,
+            "openai_request_failed",
+            "OpenAI could not process the extracted syllabus text. Please try again.",
+        )
 
-    return json.loads(response.output_text)
+    parsed = response.output_parsed
+    if not parsed:
+        return error_response(
+            502,
+            "invalid_model_response",
+            "Model returned an unexpected response shape.",
+        )
+
+    return parsed.model_dump(mode="json")
 
 def create_repeating_event(
     service,
@@ -594,19 +672,3 @@ def add_events(payload: dict = Body(...)):
     print("added events successfully")
 
     return {"message": "Events added successfully"}
-
-@app.get("/test-openai")
-def test_openai():
-    client = OpenAI(
-        api_key=api_key
-    )
-
-    response = client.responses.create(
-        model="gpt-5.5",
-        instructions="You are a coding assistant that talks like a pirate.",
-        input="Say Hello in one sentence.",
-    )
-
-    return {
-        "message": response.output_text
-    }

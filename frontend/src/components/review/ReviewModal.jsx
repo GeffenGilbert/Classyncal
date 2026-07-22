@@ -4,7 +4,8 @@ import EditableField from "./EditableField";
 import ClassScheduleTab from "./ClassScheduleTab";
 import EventsTab from "./EventsTab";
 import DueItemsTab from "./DueItemsTab";
-import ColorPicker, { DEFAULT_COLOR_ID } from "./ColorPicker";
+import ColorPicker from "./ColorPicker";
+import { DEFAULT_COLOR_ID } from "./colorPickerConfig";
 
 function getIn(obj, path) {
   return path.split(".").reduce((acc, key) => acc?.[key], obj);
