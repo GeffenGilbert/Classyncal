@@ -186,17 +186,8 @@ class ClassCancellation(BaseModel):
     confidence: Confidence
     source_text: str
 
-class CalendarEvent(BaseModel):
+class Test(BaseModel):
     title: str
-    event_type: Literal[
-        "exam",
-        "quiz",
-        "final_exam",
-        "presentation",
-        "review_session",
-        "special_class",
-        "other",
-    ]
     date: str | None
     start_time: str | None
     end_time: str | None
@@ -205,17 +196,24 @@ class CalendarEvent(BaseModel):
     confidence: Confidence
     source_text: str
 
-class Task(BaseModel):
+class Assignment(BaseModel):
     title: str
     task_type: Literal[
         "homework",
         "assignment",
         "paper",
-        "project",
         "lab",
         "problem_set",
         "other",
     ]
+    due_date: str | None
+    due_time: str | None
+    description: str
+    confidence: Confidence
+    source_text: str
+
+class Project(BaseModel):
+    title: str
     due_date: str | None
     due_time: str | None
     description: str
@@ -235,8 +233,9 @@ class SyllabusExtraction(BaseModel):
     course: Course
     class_schedule: ClassSchedule
     class_cancellations: list[ClassCancellation]
-    calendar_events: list[CalendarEvent]
-    tasks: list[Task]
+    tests: list[Test]
+    assignments: list[Assignment]
+    projects: list[Project]
     readings: list[Reading]
     missing_information: list[str]
     warnings: list[str]
@@ -352,10 +351,11 @@ Read the full syllabus text and extract structured scheduling information.
 
 You must separate:
 1. recurring class meeting schedules,
-2. one-time calendar events such as exams, quizzes, finals, presentations, and tests,
-3. task due dates such as homework, assignments, papers, labs, projects, and problem sets,
-4. readings,
-5. cancellations such as holidays, breaks, and no-class days.
+2. tests such as exams, quizzes, finals, presentations, and review sessions,
+3. assignments such as homework, papers, labs, and problem sets,
+4. projects,
+5. readings,
+6. cancellations such as holidays, breaks, and no-class days.
 
 Rules:
 - Do not invent dates, times, titles, or locations.
@@ -363,11 +363,12 @@ Rules:
 - Use 24-hour HH:MM time format for times.
 - Use ISO YYYY-MM-DD format for dates.
 - Class meeting schedules are recurring events, such as "MW 2:00-3:15", "Tues/Thurs 10am", "TR 450pm-605pm", or "every Monday and Wednesday".
-- Put recurring class schedules in class_schedule.meetings, not in calendar_events.
-- Tests, exams, midterms, finals, quizzes, presentations, review sessions, and special class meetings go in calendar_events.
-- Homework, assignments, papers, projects, labs, problem sets, and other graded or submitted work go in tasks.
-- Readings should not go in tasks. Put textbook readings, articles, book chapters, class notes, and other reading assignments in readings.
-- Put "No Class", holidays, breaks, canceled classes, and university closures in class_cancellations, not calendar_events.
+- Put recurring class schedules in class_schedule.meetings, not in tests.
+- Tests, exams, midterms, finals, quizzes, presentations, review sessions, and special class meetings go in tests.
+- Homework, papers, labs, problem sets, and other graded or submitted work (other than projects) go in assignments.
+- Projects go in projects, not in assignments.
+- Readings should not go in assignments or projects. Put textbook readings, articles, book chapters, class notes, and other reading assignments in readings.
+- Put "No Class", holidays, breaks, canceled classes, and university closures in class_cancellations, not tests.
 - If a final exam has a date but no time, include the date and set start_time and end_time to null.
 - If class meeting times are not found, set class_schedule.found to false, meetings to [], and add "Class meeting times not found" to missing_information.
 - Do not include events that do not have a date unless they are recurring class meeting schedules.
@@ -375,7 +376,7 @@ Rules:
 - If a reading is listed as TBD, do not include it in readings. Add it to warnings instead.
 - If the syllabus has a dated schedule of class meetings, use the first dated regular class meeting as start_date and the last dated regular class meeting as end_date. Mark confidence as medium if inferred.
 - If an exam, review, quiz, or presentation appears on a regular class meeting day without an explicit time/location, leave start_time, end_time, and location as null.
-- If a task, lab, homework, assignment, reading, or project is listed next to a week range, use the final day of that week range as the due_date. Mention the inference in description and set confidence to medium.
+- If an assignment, project, or reading is listed next to a week range, use the final day of that week range as the due_date. Mention the inference in description and set confidence to medium.
 - For days_of_week, use a flat array of full day names only: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.
 - For class meeting titles, use the course_code followed by the meeting type, such as "CSC 242 Lecture", "CSC 242 Lab", "CSC 242 Recitation", or "CSC 242 Class"."""
 
@@ -411,6 +412,7 @@ Rules:
             "Model returned an unexpected response shape.",
         )
 
+    print(parsed.model_dump(mode="json"))
     return parsed.model_dump(mode="json")
 
 def create_repeating_event(
@@ -573,16 +575,16 @@ def add_class_schedule(payload, service, color_id):
             color_id
         )
 
-def add_calendar_events(payload, service, color_id):
-    calendar_events = payload.get("calendar_events", [])
+def add_tests(payload, service, color_id):
+    tests = payload.get("tests", [])
 
-    if not calendar_events:
+    if not tests:
         return
 
-    for event in calendar_events:
-        date = event.get("date")
-        start_time = event.get("start_time")
-        end_time = event.get("end_time")
+    for test in tests:
+        date = test.get("date")
+        start_time = test.get("start_time")
+        end_time = test.get("end_time")
         if not date:
             continue
 
@@ -590,12 +592,12 @@ def add_calendar_events(payload, service, color_id):
             start = date + "T" + start_time + ":00"
             end = date + "T" + end_time + ":00"
             create_event(
-                service, 
-                event.get("title", "Calendar Event"), 
-                start, 
-                end, 
-                event.get("description", ""), # this is if we want descriptions included, if not then make this ""
-                event.get("location", ""), 
+                service,
+                test.get("title", "Test"),
+                start,
+                end,
+                test.get("description", ""), # this is if we want descriptions included, if not then make this ""
+                test.get("location", ""),
                 color_id
             )
             continue
@@ -603,52 +605,40 @@ def add_calendar_events(payload, service, color_id):
         next_day = date
         create_event(
             service,
-            event.get("title", "Calendar Event"),
+            test.get("title", "Test"),
             date,
             next_day,
-            event.get("description", ""),
-            event.get("location", ""),
+            test.get("description", ""),
+            test.get("location", ""),
             color_id,
             all_day=True,
         )
 
-def add_tasks(payload, service):
-    tasks = payload.get("tasks", [])
-
-    if not tasks:
+def add_due_items(items, service, default_title):
+    if not items:
         return
 
-    for task in tasks:
-        due_date = task.get("due_date")
+    for item in items:
+        due_date = item.get("due_date")
         if not due_date:
             continue
 
         create_task(
             service,
-            task.get("title", "Task"),
+            item.get("title", default_title),
             due_date,
-            task.get("due_time"),
-            task.get("description", ""),
+            item.get("due_time"),
+            item.get("description", ""),
         )
 
-def add_readings(payload, service): 
-    readings = payload.get("readings", [])
+def add_assignments(payload, service):
+    add_due_items(payload.get("assignments", []), service, "Assignment")
 
-    if not readings:
-        return
+def add_projects(payload, service):
+    add_due_items(payload.get("projects", []), service, "Project")
 
-    for reading in readings:
-        due_date = reading.get("due_date")
-        if not due_date:
-            continue
-
-        create_task(
-            service,
-            reading.get("title", "Reading"),
-            due_date,
-            reading.get("due_time"),
-            reading.get("description", ""),
-        )
+def add_readings(payload, service):
+    add_due_items(payload.get("readings", []), service, "Reading")
 
 @app.post("/add-events")
 def add_events(payload: dict = Body(...)):
@@ -666,8 +656,9 @@ def add_events(payload: dict = Body(...)):
     color_id = payload.get("color_id", 1)
 
     add_class_schedule(payload, calendar_service, color_id)
-    add_calendar_events(payload, calendar_service, color_id)
-    add_tasks(payload, tasks_service)
+    add_tests(payload, calendar_service, color_id)
+    add_assignments(payload, tasks_service)
+    add_projects(payload, tasks_service)
     add_readings(payload, tasks_service)
     print("added events successfully")
 
