@@ -28,16 +28,18 @@ function setIn(obj, path, value) {
 // user disables that tab, so its category is excluded from the calendar.
 const TAB_DATA_PATHS = {
   schedule: ["class_schedule.meetings"],
-  events: ["calendar_events"],
-  tasks: ["tasks"],
+  tests: ["tests"],
+  projects: ["projects"],
+  assignments: ["assignments"],
   readings: ["readings"],
 };
 
 function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitError }) {
   const tabs = [
     { id: "schedule", label: "Class Schedule", count: data.class_schedule.meetings.length },
-    { id: "events", label: "Events", count: data.calendar_events.length },
-    { id: "tasks", label: "Tasks", count: data.tasks.length },
+    { id: "tests", label: "Tests", count: data.tests.length },
+    { id: "projects", label: "Projects", count: data.projects.length },
+    { id: "assignments", label: "Assignments", count: data.assignments.length },
     { id: "readings", label: "Readings", count: data.readings.length },
   ];
   // Categories with nothing extracted have nothing to select or review.
@@ -230,19 +232,31 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                   onAdd={addItem}
                 />
               )}
-              {currentTab.id === "events" && (
+              {currentTab.id === "tests" && (
                 <EventsTab
-                  events={data.calendar_events}
+                  events={data.tests}
+                  path="tests"
+                  addLabel="Add test"
                   onUpdate={updateItem}
                   onRemove={removeItem}
                   onAdd={addItem}
                 />
               )}
-              {currentTab.id === "tasks" && (
+              {currentTab.id === "projects" && (
                 <DueItemsTab
-                  items={data.tasks}
-                  path="tasks"
-                  addLabel="Add task"
+                  items={data.projects}
+                  path="projects"
+                  addLabel="Add project"
+                  onUpdate={updateItem}
+                  onRemove={removeItem}
+                  onAdd={addItem}
+                />
+              )}
+              {currentTab.id === "assignments" && (
+                <DueItemsTab
+                  items={data.assignments}
+                  path="assignments"
+                  addLabel="Add assignment"
                   onUpdate={updateItem}
                   onRemove={removeItem}
                   onAdd={addItem}
