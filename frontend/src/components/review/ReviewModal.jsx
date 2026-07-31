@@ -24,24 +24,91 @@ function setIn(obj, path, value) {
   return next;
 }
 
-// Maps a tab id to the payload path(s) that should be emptied when the
-// user disables that tab, so its category is excluded from the calendar.
-const TAB_DATA_PATHS = {
-  schedule: ["class_schedule.meetings"],
-  tests: ["tests"],
-  projects: ["projects"],
-  assignments: ["assignments"],
-  readings: ["readings"],
-};
+// The payload has two content arrays — events (things that occupy time) and
+// tasks (things with a deadline) — and each carries a type field. Tabs are
+// views over those arrays rather than arrays of their own: `match` selects the
+// items a tab owns, and `blank` seeds a new item so it lands in that same tab.
+// Every item in a path must be matched by exactly one tab, or it would be
+// unreachable for review.
+const TAB_CONFIG = [
+  {
+    id: "schedule",
+    label: "Class Schedule",
+    path: "class_schedule.meetings",
+  },
+  {
+    id: "tests",
+    label: "Tests",
+    path: "events",
+    match: (item) => ["exam", "quiz", "final_exam"].includes(item.event_type),
+    addLabel: "Add test",
+    blank: {
+      title: "",
+      event_type: "exam",
+      date: "",
+      start_time: "",
+      end_time: "",
+      location: "",
+      description: "",
+    },
+  },
+  {
+    id: "events",
+    label: "Other Events",
+    path: "events",
+    // Everything the Tests tab doesn't take: review sessions, presentations,
+    // special class meetings. Kept complementary so no event is unreachable.
+    match: (item) => !["exam", "quiz", "final_exam"].includes(item.event_type),
+    addLabel: "Add event",
+    blank: {
+      title: "",
+      event_type: "other",
+      date: "",
+      start_time: "",
+      end_time: "",
+      location: "",
+      description: "",
+    },
+  },
+  {
+    id: "assignments",
+    label: "Assignments",
+    path: "tasks",
+    match: (item) => item.task_type !== "project",
+    addLabel: "Add assignment",
+    blank: { title: "", task_type: "assignment", due_date: "", due_time: "", description: "" },
+  },
+  {
+    id: "projects",
+    label: "Projects",
+    path: "tasks",
+    match: (item) => item.task_type === "project",
+    addLabel: "Add project",
+    blank: { title: "", task_type: "project", due_date: "", due_time: "", description: "" },
+  },
+  {
+    id: "readings",
+    label: "Readings",
+    path: "readings",
+    addLabel: "Add reading",
+    blank: { title: "", reading_type: "other", due_date: "", due_time: "", description: "" },
+  },
+];
+
+// Distinct paths, for the _key strip that runs over everything on confirm.
+const ALL_PATHS = [...new Set(TAB_CONFIG.map((tab) => tab.path))];
 
 function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitError }) {
-  const tabs = [
-    { id: "schedule", label: "Class Schedule", count: data.class_schedule.meetings.length },
-    { id: "tests", label: "Tests", count: data.tests.length },
-    { id: "projects", label: "Projects", count: data.projects.length },
-    { id: "assignments", label: "Assignments", count: data.assignments.length },
-    { id: "readings", label: "Readings", count: data.readings.length },
-  ];
+  // Indices into each tab's source array, so a tab can render its own subset
+  // while still updating and removing items by their real position.
+  const tabs = TAB_CONFIG.map((tab) => {
+    const items = getIn(data, tab.path);
+    const indices = items.reduce(
+      (acc, item, index) => (!tab.match || tab.match(item) ? [...acc, index] : acc),
+      [],
+    );
+    return { ...tab, items, indices, count: indices.length };
+  });
   // Categories with nothing extracted have nothing to select or review.
   // Captured once on mount so a category doesn't vanish from the selection
   // screen just because the user emptied it out while reviewing — live
@@ -117,20 +184,32 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
 
   function handleConfirm() {
     let payload = data;
-    for (const tabId of Object.keys(TAB_DATA_PATHS)) {
-      for (const path of TAB_DATA_PATHS[tabId]) {
-        const items = selectedTabs.has(tabId) ? getIn(payload, path) : [];
-        payload = setIn(
-          payload,
-          path,
-          items.map((item) => {
-            const clean = { ...item };
-            delete clean._key;
-            return clean;
-          }),
-        );
-      }
+
+    // Drop the items belonging to each category the user opted out of. Tabs can
+    // share a path (Assignments and Projects are both tasks), so this removes
+    // only the items that tab owns rather than emptying the whole array.
+    for (const tab of TAB_CONFIG) {
+      if (selectedTabs.has(tab.id)) continue;
+      payload = setIn(
+        payload,
+        tab.path,
+        getIn(payload, tab.path).filter((item) => tab.match && !tab.match(item)),
+      );
     }
+
+    // _key is a client-side render key and is not part of the backend contract.
+    for (const path of ALL_PATHS) {
+      payload = setIn(
+        payload,
+        path,
+        getIn(payload, path).map((item) => {
+          const clean = { ...item };
+          delete clean._key;
+          return clean;
+        }),
+      );
+    }
+
     onConfirm({ ...payload, color_id: colorId });
   }
 
@@ -226,47 +305,31 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
             <div className="flex-1 overflow-y-auto p-6">
               {currentTab.id === "schedule" && (
                 <ClassScheduleTab
-                  meetings={data.class_schedule.meetings}
+                  meetings={currentTab.items}
                   onUpdate={updateItem}
                   onRemove={removeItem}
                   onAdd={addItem}
                 />
               )}
-              {currentTab.id === "tests" && (
+              {["tests", "events"].includes(currentTab.id) && (
                 <EventsTab
-                  events={data.tests}
-                  path="tests"
-                  addLabel="Add test"
+                  events={currentTab.items}
+                  indices={currentTab.indices}
+                  path={currentTab.path}
+                  addLabel={currentTab.addLabel}
+                  blankItem={currentTab.blank}
                   onUpdate={updateItem}
                   onRemove={removeItem}
                   onAdd={addItem}
                 />
               )}
-              {currentTab.id === "projects" && (
+              {["assignments", "projects", "readings"].includes(currentTab.id) && (
                 <DueItemsTab
-                  items={data.projects}
-                  path="projects"
-                  addLabel="Add project"
-                  onUpdate={updateItem}
-                  onRemove={removeItem}
-                  onAdd={addItem}
-                />
-              )}
-              {currentTab.id === "assignments" && (
-                <DueItemsTab
-                  items={data.assignments}
-                  path="assignments"
-                  addLabel="Add assignment"
-                  onUpdate={updateItem}
-                  onRemove={removeItem}
-                  onAdd={addItem}
-                />
-              )}
-              {currentTab.id === "readings" && (
-                <DueItemsTab
-                  items={data.readings}
-                  path="readings"
-                  addLabel="Add reading"
+                  items={currentTab.items}
+                  indices={currentTab.indices}
+                  path={currentTab.path}
+                  addLabel={currentTab.addLabel}
+                  blankItem={currentTab.blank}
                   onUpdate={updateItem}
                   onRemove={removeItem}
                   onAdd={addItem}

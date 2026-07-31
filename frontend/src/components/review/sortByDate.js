@@ -2,9 +2,13 @@
 // tiebreaker), so callers can render in sorted order while still using the
 // original index for onUpdate/onRemove — the underlying array itself is
 // left untouched.
-export function getSortedIndices(items, dateField, timeField) {
-  return items
-    .map((_, index) => index)
+//
+// `indices` optionally restricts the result to a subset of `items`, which is
+// how a tab renders one category (e.g. only tasks whose task_type is project)
+// while still addressing the full array by its real indices.
+export function getSortedIndices(items, dateField, timeField, indices) {
+  return (indices ?? items.map((_, index) => index))
+    .slice()
     .sort((a, b) => {
       const dateA = items[a][dateField];
       const dateB = items[b][dateField];
