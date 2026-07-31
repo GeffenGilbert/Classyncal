@@ -33,7 +33,7 @@ os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1" # this is for local testing, del
 openai_api_key = os.getenv("OPENAI_API_KEY")
 # CHANGE: Keep production extraction on one default model. These env vars are
 # the only knobs needed to swap models or PDF rendering detail later.
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-nano")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-nano")
 OPENAI_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT")
 OPENAI_PDF_DETAIL = os.getenv("OPENAI_PDF_DETAIL", "auto")
 MAX_DOCUMENT_CHARS = int(os.getenv("MAX_DOCUMENT_CHARS", "600000"))
@@ -48,7 +48,7 @@ app = FastAPI()
 # Allows your React frontend to talk to this backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):517[0-9]",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -313,7 +313,7 @@ async def upload_syllabus(file: UploadFile = File(...)):
 
     if not openai_api_key:
         return error_response(
-            500,
+            503,
             "missing_openai_api_key",
             "OPENAI_API_KEY is not configured on the backend.",
         )
