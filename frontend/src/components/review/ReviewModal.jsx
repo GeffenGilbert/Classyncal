@@ -28,8 +28,14 @@ function setIn(obj, path, value) {
 // tasks (things with a deadline) — and each carries a type field. Tabs are
 // views over those arrays rather than arrays of their own: `match` selects the
 // items a tab owns, and `blank` seeds a new item so it lands in that same tab.
-// Every item in a path must be matched by exactly one tab, or it would be
-// unreachable for review.
+//
+// Where two tabs share a path, one owns a named set of types and the other is
+// the catch-all for the rest. The catch-all is written as a negation on
+// purpose: a positive list would leave an event with an unexpected or missing
+// event_type in no tab at all, invisible in review but still synced.
+const TEST_TYPES = ["exam", "quiz", "final_exam"];
+const isTest = (item) => TEST_TYPES.includes(item.event_type);
+
 const TAB_CONFIG = [
   {
     id: "schedule",
@@ -40,7 +46,7 @@ const TAB_CONFIG = [
     id: "tests",
     label: "Tests",
     path: "events",
-    match: (item) => ["exam", "quiz", "final_exam"].includes(item.event_type),
+    match: isTest,
     addLabel: "Add test",
     blank: {
       title: "",
@@ -56,9 +62,7 @@ const TAB_CONFIG = [
     id: "events",
     label: "Other Events",
     path: "events",
-    // Everything the Tests tab doesn't take: review sessions, presentations,
-    // special class meetings. Kept complementary so no event is unreachable.
-    match: (item) => !["exam", "quiz", "final_exam"].includes(item.event_type),
+    match: (item) => !isTest(item),
     addLabel: "Add event",
     blank: {
       title: "",

@@ -175,7 +175,11 @@ class ClassMeeting(BaseModel):
         "Friday",
         "Saturday",
         "Sunday",
-    ]] = Field(description="Every day this meeting recurs, as full day names.")
+    ]] = Field(
+        description="Every day this meeting recurs, as full day names. A class meeting "
+        "MW 10:00-11:15 is one meeting with both Monday and Wednesday here, not a "
+        "separate meeting per day."
+    )
     start_time: str | None = Field(description=TIME)
     end_time: str | None = Field(description=TIME)
     location: str | None
@@ -409,6 +413,12 @@ Rules:
 - Do not invent dates, times, titles, or locations.
 - If information is missing or unclear, use null and explain it in missing_information or warnings.
 - A repeating class goes in class_schedule.meetings, never in events.
+- Give class_schedule.meetings one entry per distinct recurring pattern, with all of that
+  pattern's days grouped into its days_of_week. Only add a second meeting when the class
+  genuinely has another pattern, such as a lab or recitation at a different time.
+- A week-by-week or dated schedule table lists individual sessions of a meeting you have
+  already recorded, not new meetings. Use those rows to find start_date, end_date, exams,
+  tasks, and readings. Never add a meeting for a row in that table.
 - Readings go in readings, never in tasks.
 - Do not include an item that has no date, unless it is a repeating class meeting.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
