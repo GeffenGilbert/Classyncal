@@ -18,7 +18,7 @@ import io
 from typing import Literal
 
 from docx import Document
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from fastapi.responses import RedirectResponse
 from fastapi.responses import HTMLResponse
@@ -146,6 +146,14 @@ ALLOWED_CONTENT_TYPES = {
 
 Confidence = Literal["high", "medium", "low"]
 
+# Field descriptions are sent to the model as part of the Structured Outputs
+# schema, so per-field mechanics live here rather than in the prompt. The
+# prompt is left to explain only which bucket an item belongs in.
+DATE = "ISO YYYY-MM-DD, or null if the syllabus does not state one."
+TIME = "24-hour HH:MM, or null if the syllabus does not state one."
+SOURCE_TEXT = "A short phrase copied verbatim from the syllabus supporting this item."
+CONFIDENCE_NOTE = "Use medium or low when any part of this item was inferred."
+
 # CHANGE: Structured Outputs schema replaces hand-parsed JSON text so the
 # model response must match the shape the review UI expects.
 class Course(BaseModel):
@@ -155,7 +163,10 @@ class Course(BaseModel):
     term: str | None
 
 class ClassMeeting(BaseModel):
-    title: str
+    title: str = Field(
+        description="The meeting type only, such as 'Lecture', 'Lab', or 'Recitation'. "
+        "Do not include the course code; it is added automatically."
+    )
     days_of_week: list[Literal[
         "Monday",
         "Tuesday",
@@ -164,14 +175,20 @@ class ClassMeeting(BaseModel):
         "Friday",
         "Saturday",
         "Sunday",
-    ]]
-    start_time: str | None
-    end_time: str | None
+    ]] = Field(description="Every day this meeting recurs, as full day names.")
+    start_time: str | None = Field(description=TIME)
+    end_time: str | None = Field(description=TIME)
     location: str | None
-    start_date: str | None
-    end_date: str | None
-    confidence: Confidence
-    source_text: str
+    start_date: str | None = Field(
+        description=f"{DATE} If the syllabus has a dated schedule, use the first dated "
+        "regular class meeting."
+    )
+    end_date: str | None = Field(
+        description=f"{DATE} If the syllabus has a dated schedule, use the last dated "
+        "regular class meeting."
+    )
+    confidence: Confidence = Field(description=CONFIDENCE_NOTE)
+    source_text: str = Field(description=SOURCE_TEXT)
 
 class ClassSchedule(BaseModel):
     found: bool
@@ -180,62 +197,89 @@ class ClassSchedule(BaseModel):
 
 class ClassCancellation(BaseModel):
     title: str
-    date: str | None
+    date: str | None = Field(description=DATE)
     reason: str | None
     description: str
-    confidence: Confidence
-    source_text: str
+    confidence: Confidence = Field(description=CONFIDENCE_NOTE)
+    source_text: str = Field(description=SOURCE_TEXT)
 
-class Test(BaseModel):
-    title: str
-    date: str | None
-    start_time: str | None
-    end_time: str | None
+# One-off things that occupy a block of time on a calendar. event_type carries
+# the detail that used to be split across separate top-level arrays.
+class Event(BaseModel):
+    title: str = Field(
+        description="The event name only, such as 'Midterm 1'. Do not include the "
+        "course code; it is added automatically."
+    )
+    event_type: Literal[
+        "exam",
+        "quiz",
+        "final_exam",
+        "presentation",
+        "review_session",
+        "special_class",
+        "other",
+    ] = Field(description="What kind of event this is. Use 'other' if none fit.")
+    date: str | None = Field(description=DATE)
+    start_time: str | None = Field(
+        description=f"{TIME} Leave null if the event falls on a regular class day "
+        "with no separately stated time."
+    )
+    end_time: str | None = Field(description=TIME)
     location: str | None
     description: str
-    confidence: Confidence
-    source_text: str
+    confidence: Confidence = Field(description=CONFIDENCE_NOTE)
+    source_text: str = Field(description=SOURCE_TEXT)
 
-class Assignment(BaseModel):
-    title: str
+# Things with a deadline rather than a duration. task_type carries the detail.
+class Task(BaseModel):
+    title: str = Field(
+        description="The task name only, such as 'Project 1'. Do not include the "
+        "course code; it is added automatically."
+    )
     task_type: Literal[
         "homework",
         "assignment",
         "paper",
+        "project",
         "lab",
         "problem_set",
         "other",
-    ]
-    due_date: str | None
-    due_time: str | None
+    ] = Field(
+        description="What kind of work this is. Use 'project' only when the syllabus "
+        "itself calls it a project. Use 'other' if none fit."
+    )
+    due_date: str | None = Field(
+        description=f"{DATE} If the item is listed against a week range rather than a "
+        "single day, use the last day of that range, say so in description, and set "
+        "confidence to medium."
+    )
+    due_time: str | None = Field(description=TIME)
     description: str
-    confidence: Confidence
-    source_text: str
-
-class Project(BaseModel):
-    title: str
-    due_date: str | None
-    due_time: str | None
-    description: str
-    confidence: Confidence
-    source_text: str
+    confidence: Confidence = Field(description=CONFIDENCE_NOTE)
+    source_text: str = Field(description=SOURCE_TEXT)
 
 class Reading(BaseModel):
-    title: str
+    title: str = Field(
+        description="The reading name only. Do not include the course code; it is "
+        "added automatically."
+    )
     reading_type: Literal["textbook", "article", "class_notes", "book", "other"]
-    due_date: str | None
-    due_time: str | None
+    due_date: str | None = Field(
+        description=f"{DATE} If the reading is listed against a week range rather than "
+        "a single day, use the last day of that range, say so in description, and set "
+        "confidence to medium."
+    )
+    due_time: str | None = Field(description=TIME)
     description: str
-    confidence: Confidence
-    source_text: str
+    confidence: Confidence = Field(description=CONFIDENCE_NOTE)
+    source_text: str = Field(description=SOURCE_TEXT)
 
 class SyllabusExtraction(BaseModel):
     course: Course
     class_schedule: ClassSchedule
     class_cancellations: list[ClassCancellation]
-    tests: list[Test]
-    assignments: list[Assignment]
-    projects: list[Project]
+    events: list[Event]
+    tasks: list[Task]
     readings: list[Reading]
     missing_information: list[str]
     warnings: list[str]
@@ -349,36 +393,26 @@ async def upload_syllabus(file: UploadFile = File(...)):
 
 Read the full syllabus text and extract structured scheduling information.
 
-You must separate:
-1. recurring class meeting schedules,
-2. tests such as exams, quizzes, finals, presentations, and review sessions,
-3. assignments such as homework, papers, labs, and problem sets,
-4. projects,
-5. readings,
-6. cancellations such as holidays, breaks, and no-class days.
+Sort everything you find into one of five lists. Ask "does this take up a block of
+time, or is it a deadline?" first, then pick the list:
+
+- class_schedule.meetings - a class that repeats every week, such as "MW 2:00-3:15",
+  "Tues/Thurs 10am", "TR 450pm-605pm", or "every Monday and Wednesday".
+- events - a one-off thing that occupies a block of time: exams, midterms, finals,
+  quizzes, presentations, review sessions, and special class meetings.
+- tasks - work that is due by a deadline: homework, assignments, papers, projects,
+  labs, and problem sets.
+- readings - textbook chapters, articles, books, and class notes to read.
+- class_cancellations - "No Class", holidays, breaks, and university closures.
 
 Rules:
 - Do not invent dates, times, titles, or locations.
 - If information is missing or unclear, use null and explain it in missing_information or warnings.
-- Use 24-hour HH:MM time format for times.
-- Use ISO YYYY-MM-DD format for dates.
-- Class meeting schedules are recurring events, such as "MW 2:00-3:15", "Tues/Thurs 10am", "TR 450pm-605pm", or "every Monday and Wednesday".
-- Put recurring class schedules in class_schedule.meetings, not in tests.
-- Tests, exams, midterms, finals, quizzes, presentations, review sessions, and special class meetings go in tests.
-- Homework, papers, labs, problem sets, and other graded or submitted work (other than projects) go in assignments.
-- Projects go in projects, not in assignments.
-- Readings should not go in assignments or projects. Put textbook readings, articles, book chapters, class notes, and other reading assignments in readings.
-- Put "No Class", holidays, breaks, canceled classes, and university closures in class_cancellations, not tests.
-- If a final exam has a date but no time, include the date and set start_time and end_time to null.
-- If class meeting times are not found, set class_schedule.found to false, meetings to [], and add "Class meeting times not found" to missing_information.
-- Do not include events that do not have a date unless they are recurring class meeting schedules.
-- source_text should be a short phrase copied from the syllabus that supports the extracted item.
-- If a reading is listed as TBD, do not include it in readings. Add it to warnings instead.
-- If the syllabus has a dated schedule of class meetings, use the first dated regular class meeting as start_date and the last dated regular class meeting as end_date. Mark confidence as medium if inferred.
-- If an exam, review, quiz, or presentation appears on a regular class meeting day without an explicit time/location, leave start_time, end_time, and location as null.
-- If an assignment, project, or reading is listed next to a week range, use the final day of that week range as the due_date. Mention the inference in description and set confidence to medium.
-- For days_of_week, use a flat array of full day names only: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.
-- For class meeting titles, use the course_code followed by the meeting type, such as "CSC 242 Lecture", "CSC 242 Lab", "CSC 242 Recitation", or "CSC 242 Class"."""
+- A repeating class goes in class_schedule.meetings, never in events.
+- Readings go in readings, never in tasks.
+- Do not include an item that has no date, unless it is a repeating class meeting.
+- If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
+- If class meeting times are not found, set class_schedule.found to false, meetings to [], and add "Class meeting times not found" to missing_information."""
 
     request = {
         "model": OPENAI_MODEL,
@@ -412,7 +446,6 @@ Rules:
             "Model returned an unexpected response shape.",
         )
 
-    print(parsed.model_dump(mode="json"))
     return parsed.model_dump(mode="json")
 
 def create_repeating_event(
@@ -542,6 +575,19 @@ def create_task(
 
     service.tasks().insert(tasklist=tasklist, body=body).execute()
 
+# Every item reaching Calendar or Tasks is prefixed with the course code so it is
+# identifiable out of context. Done here rather than in the prompt so it is applied
+# uniformly and cannot drift with the model's phrasing.
+def titled(payload, name, fallback):
+    name = (name or "").strip() or fallback
+    course_code = (payload.get("course") or {}).get("course_code")
+    if not course_code:
+        return name
+    course_code = course_code.strip()
+    if not course_code or name.startswith(course_code):
+        return name
+    return f"{course_code}: {name}"
+
 def add_class_schedule(payload, service, color_id):
     class_schedule = payload.get("class_schedule", {})
     meetings = class_schedule.get("meetings", [])
@@ -550,7 +596,7 @@ def add_class_schedule(payload, service, color_id):
         return
 
     for meeting in meetings:
-        title = meeting.get("title", "Class Meeting")
+        title = titled(payload, meeting.get("title"), "Class Meeting")
         days_of_week = meeting.get("days_of_week", [])
         start_time = meeting.get("start_time")
         end_time = meeting.get("end_time")
@@ -575,29 +621,26 @@ def add_class_schedule(payload, service, color_id):
             color_id
         )
 
-def add_tests(payload, service, color_id):
-    tests = payload.get("tests", [])
-
-    if not tests:
-        return
-
-    for test in tests:
-        date = test.get("date")
-        start_time = test.get("start_time")
-        end_time = test.get("end_time")
+def add_events_to_calendar(payload, service, color_id):
+    for event in payload.get("events", []):
+        date = event.get("date")
+        start_time = event.get("start_time")
+        end_time = event.get("end_time")
         if not date:
             continue
+
+        title = titled(payload, event.get("title"), "Event")
 
         if start_time and end_time:
             start = date + "T" + start_time + ":00"
             end = date + "T" + end_time + ":00"
             create_event(
                 service,
-                test.get("title", "Test"),
+                title,
                 start,
                 end,
-                test.get("description", ""), # this is if we want descriptions included, if not then make this ""
-                test.get("location", ""),
+                event.get("description", ""), # this is if we want descriptions included, if not then make this ""
+                event.get("location", ""),
                 color_id
             )
             continue
@@ -605,19 +648,16 @@ def add_tests(payload, service, color_id):
         next_day = date
         create_event(
             service,
-            test.get("title", "Test"),
+            title,
             date,
             next_day,
-            test.get("description", ""),
-            test.get("location", ""),
+            event.get("description", ""),
+            event.get("location", ""),
             color_id,
             all_day=True,
         )
 
-def add_due_items(items, service, default_title):
-    if not items:
-        return
-
+def add_due_items(payload, items, service, default_title):
     for item in items:
         due_date = item.get("due_date")
         if not due_date:
@@ -625,20 +665,17 @@ def add_due_items(items, service, default_title):
 
         create_task(
             service,
-            item.get("title", default_title),
+            titled(payload, item.get("title"), default_title),
             due_date,
             item.get("due_time"),
             item.get("description", ""),
         )
 
-def add_assignments(payload, service):
-    add_due_items(payload.get("assignments", []), service, "Assignment")
-
-def add_projects(payload, service):
-    add_due_items(payload.get("projects", []), service, "Project")
+def add_tasks(payload, service):
+    add_due_items(payload, payload.get("tasks", []), service, "Task")
 
 def add_readings(payload, service):
-    add_due_items(payload.get("readings", []), service, "Reading")
+    add_due_items(payload, payload.get("readings", []), service, "Reading")
 
 @app.post("/add-events")
 def add_events(payload: dict = Body(...)):
@@ -656,9 +693,8 @@ def add_events(payload: dict = Body(...)):
     color_id = payload.get("color_id", 1)
 
     add_class_schedule(payload, calendar_service, color_id)
-    add_tests(payload, calendar_service, color_id)
-    add_assignments(payload, tasks_service)
-    add_projects(payload, tasks_service)
+    add_events_to_calendar(payload, calendar_service, color_id)
+    add_tasks(payload, tasks_service)
     add_readings(payload, tasks_service)
     print("added events successfully")
 

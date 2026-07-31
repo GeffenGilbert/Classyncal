@@ -10,7 +10,7 @@
     "notes": "Recurring class meeting found in Meeting Time and Location. Start and end dates are based on the first and last dated class meetings in the schedule.",
     "meetings": [
       {
-        "title": "CSC 242 Artificial Intelligence",
+        "title": "Lecture",
         "days_of_week": [
           "Tuesday",
           "Thursday"
@@ -43,9 +43,10 @@
       "source_text": "Mar 12 R No Class (Spring Break)"
     }
   ],
-  "tests": [
+  "events": [
     {
       "title": "Review",
+      "event_type": "review_session",
       "date": "2026-03-03",
       "start_time": "16:50",
       "end_time": "18:05",
@@ -56,6 +57,7 @@
     },
     {
       "title": "Midterm 1",
+      "event_type": "exam",
       "date": "2026-03-05",
       "start_time": "16:50",
       "end_time": "18:05",
@@ -66,6 +68,7 @@
     },
     {
       "title": "Review",
+      "event_type": "review_session",
       "date": "2026-04-14",
       "start_time": "16:50",
       "end_time": "18:05",
@@ -76,6 +79,7 @@
     },
     {
       "title": "Midterm 2",
+      "event_type": "exam",
       "date": "2026-04-16",
       "start_time": "16:50",
       "end_time": "18:05",
@@ -86,6 +90,7 @@
     },
     {
       "title": "Final Exam",
+      "event_type": "final_exam",
       "date": "2026-05-06",
       "start_time": "19:15",
       "end_time": "21:15",
@@ -95,10 +100,10 @@
       "source_text": "May 6 W Final Exam (715-915pm)"
     }
   ],
-  "assignments": [],
-  "projects": [
+  "tasks": [
     {
       "title": "Project 1",
+      "task_type": "project",
       "due_date": "2026-02-09",
       "due_time": null,
       "description": "Project 1 assigned Jan 22; due Feb 9.",
@@ -107,6 +112,7 @@
     },
     {
       "title": "Project 2",
+      "task_type": "project",
       "due_date": "2026-02-23",
       "due_time": null,
       "description": "Project 2 assigned Feb 5; due Feb 23.",
@@ -115,6 +121,7 @@
     },
     {
       "title": "Project 3",
+      "task_type": "project",
       "due_date": "2026-03-02",
       "due_time": null,
       "description": "Project 3 assigned Feb 19; due Mar 2.",
@@ -123,6 +130,7 @@
     },
     {
       "title": "Project 4",
+      "task_type": "project",
       "due_date": "2026-04-06",
       "due_time": null,
       "description": "Project 4 assigned Mar 19; due Apr 6.",
@@ -131,6 +139,7 @@
     },
     {
       "title": "Project 5",
+      "task_type": "project",
       "due_date": "2026-04-27",
       "due_time": null,
       "description": "Project 5 assigned Apr 2; due Apr 27.",

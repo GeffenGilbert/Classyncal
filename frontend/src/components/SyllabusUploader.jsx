@@ -17,9 +17,8 @@ function withStableKeys(data) {
   return {
     ...data,
     class_schedule: { ...data.class_schedule, meetings: addKeys(data.class_schedule.meetings) },
-    tests: addKeys(data.tests),
-    projects: addKeys(data.projects),
-    assignments: addKeys(data.assignments),
+    events: addKeys(data.events),
+    tasks: addKeys(data.tasks),
     readings: addKeys(data.readings),
   };
 }

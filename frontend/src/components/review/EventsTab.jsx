@@ -4,21 +4,13 @@ import ItemRow from "./ItemRow";
 import AddItemButton from "./AddItemButton";
 import { getSortedIndices } from "./sortByDate";
 
-const BLANK_EVENT = {
-  title: "",
-  date: "",
-  start_time: "",
-  end_time: "",
-  location: "",
-  description: "",
-};
-
-// Shared by any tab whose items render as one-off calendar events (date +
-// optional time range + location), such as Tests.
-function EventsTab({ events, path, addLabel, onUpdate, onRemove, onAdd }) {
+// Any tab whose items render as one-off calendar entries: a date, an optional
+// time range, and a location. `indices` selects which of `events` this tab
+// shows; `blankItem` carries the type field for newly added items.
+function EventsTab({ events, indices, path, addLabel, blankItem, onUpdate, onRemove, onAdd }) {
   return (
     <div className="flex flex-col">
-      {getSortedIndices(events, "date", "start_time").map((index) => {
+      {getSortedIndices(events, "date", "start_time", indices).map((index) => {
         const event = events[index];
         return (
           <ItemRow key={event._key} onRemove={() => onRemove(path, index)}>
@@ -67,7 +59,7 @@ function EventsTab({ events, path, addLabel, onUpdate, onRemove, onAdd }) {
         );
       })}
 
-      <AddItemButton label={addLabel} onClick={() => onAdd(path, BLANK_EVENT)} />
+      <AddItemButton label={addLabel} onClick={() => onAdd(path, blankItem)} />
     </div>
   );
 }
