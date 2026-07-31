@@ -32,43 +32,69 @@ treated as stable unless a frontend change requires a small backend adjustment.
 - `frontend/` — Vite + React 19 (JSX, not TypeScript despite `tsc` in the `dev`/`build`
   scripts — there is currently no actual TS source). Talks to the backend at
   `http://localhost:8000` (hardcoded absolute URLs today).
-- `backend/` — FastAPI (`backend/main.py`), single file. Uses OpenAI (`gpt-5-mini`) to
-  extract structured data from the uploaded PDF, and the Google Calendar/Tasks APIs to
-  write events. Run via `uvicorn main:app --reload` from `backend/` with the venv active
-  (see comment at top of `main.py`). CORS is currently locked to
-  `http://localhost:5173`.
-- `backend/format.json` is a real example of the JSON shape the backend returns from
-  `/upload-syllabus` and expects back for `/add-events` — treat it as the source of
-  truth for the data model. Top-level keys: `course`, `class_schedule` (recurring
-  meetings), `class_cancellations`, `calendar_events` (exams/quizzes/etc, one-off),
-  `tasks` (homework/assignments/projects), `readings`, `missing_information`,
-  `warnings`. Every extracted item carries a `confidence` (`high`/`medium`/`low`) and a
-  `source_text` snippet — these are worth surfacing in the UI so users know what to
-  double check.
+- `backend/` — FastAPI (`backend/main.py`), single file. Uses OpenAI (model set by the
+  `OPENAI_MODEL` env var) with Structured Outputs to extract data from the uploaded
+  syllabus, and the Google Calendar/Tasks APIs to write events. Run via
+  `uvicorn main:app --reload` from `backend/` with the venv active (see comment at top
+  of `main.py`). CORS allows any `localhost`/`127.0.0.1` port in the 5170–5179 range,
+  since Vite moves ports when 5173 is taken.
+- The `SyllabusExtraction` Pydantic model in `main.py` **is** the data model — Structured
+  Outputs guarantees the response matches it, so the schema is the contract, not
+  something the prompt has to enforce. `backend/format.json` is a real example of that
+  same shape, which `/add-events` accepts back. Top-level keys: `course`,
+  `class_schedule` (recurring meetings), `class_cancellations`, `events`, `tasks`,
+  `readings`, `missing_information`, `warnings`. Every extracted item carries a
+  `confidence` (`high`/`medium`/`low`) and a `source_text` snippet — these are worth
+  surfacing in the UI so users know what to double check.
 
-## Frontend state today
+### Why `events` and `tasks` rather than finer categories
 
-`frontend/src/App.jsx` is a single-component, functionality-only prototype (inline
-styles, no componentization, no styling system wired up) — this is what we're
-replacing. Notable existing behavior worth preserving as we rebuild:
-- File select → `uploadFile()` → stores the raw backend JSON in `backendMessage` state.
-- `connectGoogle()` opens the OAuth popup and listens for the `google-auth-success`
-  `postMessage`.
-- `addEvents()` POSTs `backendMessage` back to `/add-events`.
-- `DisplayClassSchedule` / `DisplayTasks` are minimal read-only renderers — no editing,
-  no removal, no support for `calendar_events`/`readings`/`class_cancellations` yet.
+The split is on **destination**, not vocabulary: `events` occupy a block of time and go
+to Google Calendar; `tasks` have a deadline and go to Google Tasks. That is a structural
+question the model answers reliably. Finer distinctions live in the `event_type` and
+`task_type` enums, which Structured Outputs constrains to valid values for free.
 
-Styling/UI dependencies already installed in `frontend/package.json` but **not yet wired
-up**: `tailwindcss` + `@tailwindcss/vite`, `@base-ui/react`, `shadcn`, `lucide-react`,
-`class-variance-authority`, `tailwind-merge`, `tw-animate-css`. `vite.config.js` has no
-Tailwind plugin yet and `index.css`/`App.css` are still the default Vite template
-styles/animation (`App.css`'s `.hero` rotation is unused boilerplate). Setting up
-Tailwind + shadcn is likely one of the first steps in rebuilding the UI.
+This was tried the other way round (separate `tests`/`assignments`/`projects` arrays) and
+reverted: choosing an array is an irreversible routing decision made before any content
+is written, and "is a lab report a project or an assignment?" has no correct answer. Add
+new distinctions as enum values, not as new top-level arrays.
+
+Two consequences worth knowing:
+- **Review tabs are filters, not arrays.** `TAB_CONFIG` in `ReviewModal.jsx` maps each
+  tab to a `path` plus a `match` predicate, so Tests / Other Events / Assignments /
+  Projects can be separate tabs over two arrays. Predicates sharing a path must stay
+  complementary — an item no tab matches is unreachable for review but still synced.
+- **Per-field guidance belongs in `Field(description=...)`**, not the prompt. Those
+  descriptions ship to the model inside the schema. The prompt covers only which bucket
+  an item belongs in; date formats, week-range inference, and `source_text` rules sit on
+  the fields themselves.
+
+Course codes are prefixed onto every title (`"CSC 242: Midterm 1"`) by `titled()` in the
+sync layer, not by the model — so it applies uniformly and cannot drift with phrasing.
+The model is told to return bare titles.
+
+## Frontend layout
+
+The prototype has been replaced. `App.jsx` is now a thin shell composing `MouseTrail`,
+`Header`, `HowItWorks`, and `SyllabusUploader`. Tailwind v4 is wired up via
+`@tailwindcss/vite` in `vite.config.js` and `@import "tailwindcss"` in `index.css`
+(there is no `App.css` and no `tailwind.config.js` — v4 configures via `@theme` in CSS).
+
+- `SyllabusUploader.jsx` owns the whole flow: file select/drag, the `POST` to
+  `/upload-syllabus`, the `UploadingScreen` while it runs, and then `ReviewModal`. It
+  also adds a `_key` to every item on arrival (`withStableKeys`) because backend items
+  have no stable id and React reuses components across removals without one. `_key` is
+  stripped before the payload goes back to `/add-events`.
+- `components/review/` holds the editing UI: `ReviewModal` drives a select → per-tab
+  review → color-pick → confirm sequence, and delegates rows to `ClassScheduleTab`,
+  `EventsTab` (one-off, date + time range + location), and `DueItemsTab` (deadline
+  only). The latter two are generic over `path`/`indices`/`blankItem`, which is what
+  lets several tabs share one array.
 
 ## Conventions / gotchas
 
-- Backend base URL is hardcoded as `http://localhost:8000` in the frontend and CORS on
-  the backend only allows `http://localhost:5173` — keep both in sync if ports change.
+- Backend base URL is hardcoded as `http://localhost:8000` in the frontend; the backend
+  accepts any localhost port in 5170–5179 — keep both in sync if ports change.
 - Dates are `YYYY-MM-DD`, times are 24-hour `HH:MM`, both may be `null` when the source
   PDF didn't specify them — the UI needs to handle nulls gracefully (e.g. all-day
   events, tasks with no due time).
