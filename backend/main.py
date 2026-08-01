@@ -576,7 +576,10 @@ this take up a block of time, or is it a deadline?" first, then pick the list:
   quizzes, presentations, review sessions, and special class meetings.
 - tasks - work that is due by a deadline: homework, assignments, papers, projects,
   labs, and problem sets.
-- readings - textbook chapters, articles, books, and class notes to read.
+- readings - textbook chapters, articles, books, and class notes to read. Where a
+  schedule row gives both a lecture topic and the material for it ("Informed Search"
+  alongside "3.5, 3.6"), the reading is the material, never the topic, and its date is
+  that row's date.
 - class_cancellations - "No Class", holidays, breaks, and university closures.
 
 Rules:
@@ -600,6 +603,9 @@ Rules:
   at a fixed time rather than handing them in, so they are not work with a deadline.
 - Readings go in readings, never in tasks.
 - Holidays, breaks, and no-class days go in class_cancellations, never in events.
+- A break spanning several days becomes one cancellation for each day the class would
+  otherwise have met - not one entry for the whole range, and not one per calendar day.
+  A Monday-Friday break for a class meeting Tuesdays and Thursdays is two cancellations.
 - Only record scheduled work and dated events. Policy text - make-up rules, grading
   breakdowns, contact instructions, attendance rules - is not an item. Do not turn it
   into a task because it describes something a student might have to do.
