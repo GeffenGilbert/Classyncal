@@ -604,6 +604,9 @@ Rules:
 - A week-by-week or dated schedule table lists individual sessions of a meeting you have
   already recorded, not new meetings. Use those rows to find start_date, end_date, exams,
   tasks, and readings. Never add a meeting for a row in that table.
+- A table of sections is not that kind of table: rows giving a day, a time and a room but
+  no calendar date, such as a recitation or lab schedule. Every row there is a separate
+  section of the class and must be recorded as its own meeting.
 - Exams, midterms, finals, and quizzes go in events, never in tasks. A student sits them
   at a fixed time rather than handing them in, so they are not work with a deadline.
 - Readings go in readings, never in tasks.
