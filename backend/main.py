@@ -547,7 +547,9 @@ Rules:
 - Record every class meeting you can identify, even when some of its details are missing
   or look wrong. Set the unknown fields to null and say what was missing in
   missing_information. Never drop a meeting because you could not fill it in completely,
-  and never drop one because a stated time looks like a typo — record it as written.
+  and never drop one because a stated time looks wrong. Where a time is plainly a typo,
+  such as an afternoon class written as "2:00-3:15 AM", record the time the syllabus
+  meant and note the correction in warnings.
 - Give each distinct recurring pattern its own entry, with all of that pattern's days
   grouped into its days_of_week. Lecture, lab, and recitation are separate entries. When
   one of them is offered as several sections at different times, record every section as
