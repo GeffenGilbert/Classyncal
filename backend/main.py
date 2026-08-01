@@ -575,52 +575,47 @@ Sort everything you find into exactly one of five lists. Every item belongs in a
 list: once you have recorded something, never record it again in another list. Ask "does
 this take up a block of time, or is it a deadline?" first, then pick the list:
 
-- class_schedule.meetings - a class that repeats every week, such as "MW 2:00-3:15",
-  "Tues/Thurs 10am", "TR 450pm-605pm", or "every Monday and Wednesday".
+- class_schedule.meetings - a class that repeats every week, such as "MW 2:00-3:15" or
+  "every Tuesday and Thursday".
 - events - a one-off thing that occupies a block of time: exams, midterms, finals,
   quizzes, presentations, review sessions, and special class meetings.
 - tasks - work that is due by a deadline: homework, assignments, papers, projects,
   labs, and problem sets.
 - readings - textbook chapters, articles, books, and class notes to read. Where a
-  schedule row gives both a lecture topic and the material for it ("Informed Search"
-  alongside "3.5, 3.6"), the reading is the material, never the topic, and its date is
-  that row's date.
+  schedule row gives both a lecture topic and the material for it, the reading is the
+  material, never the topic, and its date is that row's date.
 - class_cancellations - "No Class", holidays, breaks, and university closures.
+
+The confusions worth naming: a repeating class is never an event, an exam is never a
+task because a student sits it rather than hands it in, a reading is never a task, and
+a break is never an event.
 
 Rules:
 - Do not invent dates, times, titles, or locations.
 - If information is missing or unclear, use null and explain it in missing_information or warnings.
-- A repeating class goes in class_schedule.meetings, never in events.
-- Record every class meeting you can identify, even when some of its details are missing
-  or look wrong. Set the unknown fields to null and say what was missing in
-  missing_information. Never drop a meeting because you could not fill it in completely,
-  and never drop one because a stated time looks wrong. Where a time is plainly a typo,
-  such as an afternoon class written as "2:00-3:15 AM", record the time the syllabus
-  meant and note the correction in warnings.
+- Record every class meeting you can identify, even when details are missing or look
+  wrong. Set the unknown fields to null and say what was missing in missing_information.
+  Never drop a meeting for being incomplete. Where a stated time is plainly a typo,
+  record the time the syllabus meant and note the correction in warnings.
 - Give each distinct recurring pattern its own entry, with all of that pattern's days
-  grouped into its days_of_week. Lecture, lab, and recitation are separate entries. When
-  one of them is offered as several sections at different times, record every section as
-  its own entry rather than collapsing them or picking one.
+  grouped into its days_of_week. Lecture, lab and recitation are separate entries, and
+  when one of them is offered as several sections at different times, record every
+  section rather than collapsing them or picking one.
 - A week-by-week or dated schedule table lists individual sessions of a meeting you have
-  already recorded, not new meetings. Use those rows to find start_date, end_date, exams,
-  tasks, and readings. Never add a meeting for a row in that table.
+  already recorded. Use those rows to find start_date, end_date, exams, tasks and
+  readings, but never add a meeting for one.
 - A table of sections is not that kind of table: rows giving a day, a time and a room but
-  no calendar date, such as a recitation or lab schedule. Every row there is a separate
-  section of the class and must be recorded as its own meeting.
-- Exams, midterms, finals, and quizzes go in events, never in tasks. A student sits them
-  at a fixed time rather than handing them in, so they are not work with a deadline.
-- Readings go in readings, never in tasks.
-- Holidays, breaks, and no-class days go in class_cancellations, never in events.
+  no calendar date. Every row there is a separate section and is its own meeting.
 - A break spanning several days becomes one cancellation for each day the class would
   otherwise have met - not one entry for the whole range, and not one per calendar day.
-  A Monday-Friday break for a class meeting Tuesdays and Thursdays is two cancellations.
 - Only record scheduled work and dated events. Policy text - make-up rules, grading
-  breakdowns, contact instructions, attendance rules - is not an item. Do not turn it
-  into a task because it describes something a student might have to do.
+  breakdowns, contact instructions - is not an item, however much it describes something
+  a student must do.
 - Do not include an item that has no date, unless it is a repeating class meeting.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
-- If the syllabus has a dated schedule of class meetings, use the first dated regular class meeting as start_date and the last dated regular class meeting as end_date. Mark confidence as medium if inferred.
-- If there is no dated schedule, take start_date and end_date from whatever states the term's span, such as a list of important dates naming the first day of classes and the last day of lecture.
+- Take start_date and end_date from the first and last dated class meetings where the
+  syllabus has a dated schedule, otherwise from whatever states the term's span. Mark
+  confidence as medium if inferred.
 - Set class_schedule.found to false only when the syllabus says nothing at all about when
   the class meets. Finding a meeting but not its times is still found = true."""
 
