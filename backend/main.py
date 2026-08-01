@@ -419,8 +419,9 @@ async def upload_syllabus(file: UploadFile = File(...)):
 
 Read the full syllabus text and extract structured scheduling information.
 
-Sort everything you find into one of five lists. Ask "does this take up a block of
-time, or is it a deadline?" first, then pick the list:
+Sort everything you find into exactly one of five lists. Every item belongs in a single
+list: once you have recorded something, never record it again in another list. Ask "does
+this take up a block of time, or is it a deadline?" first, then pick the list:
 
 - class_schedule.meetings - a class that repeats every week, such as "MW 2:00-3:15",
   "Tues/Thurs 10am", "TR 450pm-605pm", or "every Monday and Wednesday".
@@ -446,7 +447,13 @@ Rules:
 - A week-by-week or dated schedule table lists individual sessions of a meeting you have
   already recorded, not new meetings. Use those rows to find start_date, end_date, exams,
   tasks, and readings. Never add a meeting for a row in that table.
+- Exams, midterms, finals, and quizzes go in events, never in tasks. A student sits them
+  at a fixed time rather than handing them in, so they are not work with a deadline.
 - Readings go in readings, never in tasks.
+- Holidays, breaks, and no-class days go in class_cancellations, never in events.
+- Only record scheduled work and dated events. Policy text - make-up rules, grading
+  breakdowns, contact instructions, attendance rules - is not an item. Do not turn it
+  into a task because it describes something a student might have to do.
 - Do not include an item that has no date, unless it is a repeating class meeting.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
 - Set class_schedule.found to false only when the syllabus says nothing at all about when
