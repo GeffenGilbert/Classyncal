@@ -158,10 +158,12 @@ CONFIDENCE_NOTE = "Use medium or low when any part of this item was inferred."
 # no trace of the extraction process — source_text already holds the quote, confidence
 # and missing_information already carry uncertainty.
 DESCRIPTION = (
-    "A short plain-language summary of what this is, shown to the user in their "
-    "calendar. Describe the work or event itself, in your own words. Never quote the "
+    "One short sentence summarising this item, shown to the user in their calendar. "
+    "Match the style of these examples exactly: 'First midterm exam during the regular "
+    "class meeting.' / 'Project 1 assigned Jan 22; due Feb 9.' / 'Reading for "
+    "Introduction.' / 'Class does not meet due to Spring Break.' Never quote the "
     "syllabus, never mention what was or was not specified, and never describe what you "
-    "did or could not determine while reading. Leave it empty if the syllabus adds "
+    "could or could not determine while reading. Leave it empty if the syllabus adds "
     "nothing beyond the title."
 )
 
@@ -214,9 +216,14 @@ class ClassSchedule(BaseModel):
     meetings: list[ClassMeeting]
 
 class ClassCancellation(BaseModel):
-    title: str
+    title: str = Field(
+        description="A short label for the cancelled session, normally 'No Class'. "
+        "Not a sentence — the explanation belongs in reason and description."
+    )
     date: str | None = Field(description=DATE)
-    reason: str | None
+    reason: str | None = Field(
+        description="The cause, as a short noun phrase such as 'Spring Break'."
+    )
     description: str = Field(description=DESCRIPTION)
     confidence: Confidence = Field(description=CONFIDENCE_NOTE)
     source_text: str = Field(description=SOURCE_TEXT)
@@ -286,7 +293,10 @@ class Reading(BaseModel):
         "a single day, use the last day of that range and set confidence to medium."
     )
     due_time: str | None = Field(description=TIME)
-    description: str = Field(description=DESCRIPTION)
+    description: str = Field(
+        description=DESCRIPTION + " For a reading, name the topic it covers rather than "
+        "the date it is assigned, which is already in due_date."
+    )
     confidence: Confidence = Field(description=CONFIDENCE_NOTE)
     source_text: str = Field(description=SOURCE_TEXT)
 
