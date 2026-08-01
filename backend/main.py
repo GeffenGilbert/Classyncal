@@ -159,13 +159,10 @@ CONFIDENCE_NOTE = "Use medium or low when any part of this item was inferred."
 # no trace of the extraction process — source_text already holds the quote, confidence
 # and missing_information already carry uncertainty.
 DESCRIPTION = (
-    "One short sentence summarising this item, shown to the user in their calendar. "
-    "Match the style of these examples exactly: 'First midterm exam during the regular "
-    "class meeting.' / 'Project 1 assigned Jan 22; due Feb 9.' / 'Reading for "
-    "Introduction.' / 'Class does not meet due to Spring Break.' Never quote the "
-    "syllabus, never mention what was or was not specified, and never describe what you "
-    "could or could not determine while reading. Leave it empty if the syllabus adds "
-    "nothing beyond the title."
+    "One short sentence saying plainly what this is, shown to the user in their "
+    "calendar. Never quote the syllabus, never mention what was or was not specified, "
+    "and never describe what you could or could not determine while reading. Leave it "
+    "empty if the syllabus adds nothing beyond the title."
 )
 
 # CHANGE: Structured Outputs schema replaces hand-parsed JSON text so the
