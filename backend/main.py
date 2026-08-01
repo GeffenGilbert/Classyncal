@@ -15,6 +15,7 @@ from openai import OpenAI
 
 import base64
 import io
+import re
 from typing import Literal
 
 from docx import Document
@@ -301,6 +302,80 @@ class SyllabusExtraction(BaseModel):
     missing_information: list[str]
     warnings: list[str]
 
+# --- Deduplication -----------------------------------------------------------------
+#
+# Syllabi name the same thing in more than one place. Psyc lists every essay twice:
+# once in the weekly schedule ("Essay 2") and again in a separate essay schedule
+# ("Unplug Day Essay"). The model dutifully records both, so the user sees six essays
+# where there are three. Prompt rules catch this only sometimes; these three do it every
+# time. Two items are the same thing when:
+#
+#   1. their titles match, or one is the start of the other
+#      ("Principles of Life (Hillis et al.)" and "...(Hillis et al.) a")
+#   2. they fall on the same date, are the same type, and one is a generic label
+#      ("Essay 2" next to "Unplug Day Essay", both due 3/30)
+#   3. the same title appears in both events and tasks - an exam belongs in events
+#
+# Rule 2 requires a generic label on one side deliberately: two differently-named
+# assignments due the same day are two assignments, and must not be merged.
+
+# A title that names a category and a number but nothing specific about the work.
+GENERIC_TITLE = re.compile(
+    r"^(essay|assignment|homework|hw|quiz|test|exam|midterm|final|project|paper"
+    r"|problem set|pset|lab|reading|questionnaire)\s*\d*$"
+)
+
+def normalized_title(title):
+    """Lowercased, punctuation stripped, so 'Essay 1.' and 'essay 1' compare equal."""
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", (title or "").lower()).split())
+
+def same_item(a, b, date_field, type_field):
+    title_a = normalized_title(a.get("title"))
+    title_b = normalized_title(b.get("title"))
+
+    # The shorter title must end on a word boundary in the longer one, or "Project 1"
+    # would swallow "Project 10".
+    if title_a and title_b:
+        short, long = sorted((title_a, title_b), key=len)
+        if long == short or long.startswith(short + " "):
+            return True
+
+    date = a.get(date_field)
+    if not date or date != b.get(date_field):
+        return False
+    if type_field and a.get(type_field) != b.get(type_field):
+        return False
+    return bool(GENERIC_TITLE.match(title_a) or GENERIC_TITLE.match(title_b))
+
+def dedupe_list(items, date_field, type_field):
+    """Keep one of each item, preferring the longer - and so more descriptive - title."""
+    kept = []
+    for item in items:
+        match = next((k for k in kept if same_item(item, k, date_field, type_field)), None)
+        if match is None:
+            kept.append(item)
+        elif len(item.get("title") or "") > len(match.get("title") or ""):
+            kept[kept.index(match)] = item
+    return kept
+
+DEDUPE_FIELDS = {
+    "events": ("date", "event_type"),
+    "tasks": ("due_date", "task_type"),
+    "readings": ("due_date", "reading_type"),
+    "class_cancellations": ("date", None),
+}
+
+def deduplicate(payload):
+    for key, (date_field, type_field) in DEDUPE_FIELDS.items():
+        payload[key] = dedupe_list(payload.get(key, []), date_field, type_field)
+
+    # Rule 3. Anything recorded as both an event and a task stays an event.
+    event_titles = {normalized_title(e.get("title")) for e in payload["events"]}
+    payload["tasks"] = [
+        t for t in payload["tasks"] if normalized_title(t.get("title")) not in event_titles
+    ]
+    return payload
+
 # Every item reaching Calendar or Tasks is prefixed with the course code so it is
 # identifiable out of context. Done here rather than in the prompt so it is applied
 # uniformly and cannot drift with the model's phrasing.
@@ -517,7 +592,8 @@ Rules:
             "Model returned an unexpected response shape.",
         )
 
-    return apply_course_code(parsed.model_dump(mode="json"))
+    # Deduplicate before prefixing, so the course code does not mask a generic title.
+    return apply_course_code(deduplicate(parsed.model_dump(mode="json")))
 
 def create_repeating_event(
     service,
