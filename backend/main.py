@@ -196,17 +196,8 @@ class ClassMeeting(BaseModel):
     start_time: str | None = Field(description=TIME)
     end_time: str | None = Field(description=TIME)
     location: str | None
-    start_date: str | None = Field(
-        description=f"{DATE} The first date this meeting occurs. Take it from a dated "
-        "schedule table if there is one, otherwise from a list of important dates "
-        "(a line like 'Tuesday 8/26: Classes Start' gives the term start)."
-    )
-    end_date: str | None = Field(
-        description=f"{DATE} The last date this meeting occurs. Take it from a dated "
-        "schedule table if there is one, otherwise from a list of important dates "
-        "(a line like 'Thursday 12/4: Last day of Lecture' gives the term end). Without "
-        "this the meeting cannot be scheduled, so infer it from the term when stated."
-    )
+    start_date: str | None = Field(description=f"{DATE} The first date this meeting occurs.")
+    end_date: str | None = Field(description=f"{DATE} The last date this meeting occurs.")
     confidence: Confidence = Field(description=CONFIDENCE_NOTE)
     source_text: str = Field(description=SOURCE_TEXT)
 
@@ -456,6 +447,8 @@ Rules:
   into a task because it describes something a student might have to do.
 - Do not include an item that has no date, unless it is a repeating class meeting.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
+- If the syllabus has a dated schedule of class meetings, use the first dated regular class meeting as start_date and the last dated regular class meeting as end_date. Mark confidence as medium if inferred.
+- If there is no dated schedule, take start_date and end_date from whatever states the term's span, such as a list of important dates naming the first day of classes and the last day of lecture.
 - Set class_schedule.found to false only when the syllabus says nothing at all about when
   the class meets. Finding a meeting but not its times is still found = true."""
 
@@ -633,12 +626,34 @@ def titled(payload, name, fallback):
         return name
     return f"{course_code}: {name}"
 
+# A recurring meeting needs a start and end date to be scheduled at all, and the model
+# supplies them unreliably. Rather than silently skipping the meeting, fall back to the
+# span of everything else that is dated in the same syllabus - exams, due dates,
+# cancellations - which brackets the term closely enough to be useful and is at worst a
+# week or so long at the end. Returns (None, None) only if nothing anywhere has a date.
+def term_bounds(payload):
+    dates = []
+    for meeting in payload.get("class_schedule", {}).get("meetings", []):
+        dates += [meeting.get("start_date"), meeting.get("end_date")]
+    for key in ("events", "class_cancellations"):
+        dates += [item.get("date") for item in payload.get(key, [])]
+    for key in ("tasks", "readings"):
+        dates += [item.get("due_date") for item in payload.get(key, [])]
+
+    dates = sorted(d for d in dates if d)
+    if not dates:
+        return None, None
+    return dates[0], dates[-1]
+
 def add_class_schedule(payload, service, color_id):
     class_schedule = payload.get("class_schedule", {})
     meetings = class_schedule.get("meetings", [])
 
     if not meetings:
         return
+
+    fallback_start, fallback_end = term_bounds(payload)
+    report = {"added": 0, "dates_inferred": 0, "skipped": []}
 
     for meeting in meetings:
         title = titled(payload, meeting.get("title"), "Class Meeting")
@@ -649,7 +664,14 @@ def add_class_schedule(payload, service, color_id):
         end_date = meeting.get("end_date")
         location = meeting.get("location", "")
 
+        inferred = not (start_date and end_date)
+        start_date = start_date or fallback_start
+        end_date = end_date or fallback_end
+
         if not (days_of_week and start_time and end_time and start_date and end_date):
+            # Still unschedulable. Name it in the response rather than dropping it
+            # silently, which previously made a whole schedule vanish with no error.
+            report["skipped"].append(title)
             continue
 
         start = f"{start_date}T{start_time}:00"
@@ -661,10 +683,14 @@ def add_class_schedule(payload, service, color_id):
             start,
             end,
             days_of_week,
-            end_date, 
-            location, 
+            end_date,
+            location,
             color_id
         )
+        report["added"] += 1
+        report["dates_inferred"] += 1 if inferred else 0
+
+    return report
 
 def add_events_to_calendar(payload, service, color_id):
     for event in payload.get("events", []):
@@ -737,10 +763,12 @@ def add_events(payload: dict = Body(...)):
     tasks_service = build("tasks", "v1", credentials=creds)
     color_id = payload.get("color_id", 1)
 
-    add_class_schedule(payload, calendar_service, color_id)
+    schedule_report = add_class_schedule(payload, calendar_service, color_id)
     add_events_to_calendar(payload, calendar_service, color_id)
     add_tasks(payload, tasks_service)
     add_readings(payload, tasks_service)
     print("added events successfully")
 
-    return {"message": "Events added successfully"}
+    # Report what happened to the class schedule so a meeting that could not be
+    # scheduled is visible to the caller instead of disappearing.
+    return {"message": "Events added successfully", "class_schedule": schedule_report}
