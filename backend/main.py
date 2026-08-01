@@ -332,6 +332,12 @@ def normalized_title(title):
 def same_item(a, b, date_field, type_field):
     title_a = normalized_title(a.get("title"))
     title_b = normalized_title(b.get("title"))
+    date = a.get(date_field)
+
+    # Same day, or both undated. Two "No Class" cancellations a week apart are two
+    # separate days off, however identical their titles.
+    if date != b.get(date_field):
+        return False
 
     # The shorter title must end on a word boundary in the longer one, or "Project 1"
     # would swallow "Project 10".
@@ -340,8 +346,7 @@ def same_item(a, b, date_field, type_field):
         if long == short or long.startswith(short + " "):
             return True
 
-    date = a.get(date_field)
-    if not date or date != b.get(date_field):
+    if not date:
         return False
     if type_field and a.get(type_field) != b.get(type_field):
         return False
