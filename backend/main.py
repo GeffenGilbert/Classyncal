@@ -153,6 +153,17 @@ DATE = "ISO YYYY-MM-DD, or null if the syllabus does not state one."
 TIME = "24-hour HH:MM, or null if the syllabus does not state one."
 SOURCE_TEXT = "A short phrase copied verbatim from the syllabus supporting this item."
 CONFIDENCE_NOTE = "Use medium or low when any part of this item was inferred."
+# description is written into the Google Calendar event body / Google Task notes, so
+# it is read by the student long after the upload. It is the one field that must carry
+# no trace of the extraction process — source_text already holds the quote, confidence
+# and missing_information already carry uncertainty.
+DESCRIPTION = (
+    "A short plain-language summary of what this is, shown to the user in their "
+    "calendar. Describe the work or event itself, in your own words. Never quote the "
+    "syllabus, never mention what was or was not specified, and never describe what you "
+    "did or could not determine while reading. Leave it empty if the syllabus adds "
+    "nothing beyond the title."
+)
 
 # CHANGE: Structured Outputs schema replaces hand-parsed JSON text so the
 # model response must match the shape the review UI expects.
@@ -184,12 +195,15 @@ class ClassMeeting(BaseModel):
     end_time: str | None = Field(description=TIME)
     location: str | None
     start_date: str | None = Field(
-        description=f"{DATE} If the syllabus has a dated schedule, use the first dated "
-        "regular class meeting."
+        description=f"{DATE} The first date this meeting occurs. Take it from a dated "
+        "schedule table if there is one, otherwise from a list of important dates "
+        "(a line like 'Tuesday 8/26: Classes Start' gives the term start)."
     )
     end_date: str | None = Field(
-        description=f"{DATE} If the syllabus has a dated schedule, use the last dated "
-        "regular class meeting."
+        description=f"{DATE} The last date this meeting occurs. Take it from a dated "
+        "schedule table if there is one, otherwise from a list of important dates "
+        "(a line like 'Thursday 12/4: Last day of Lecture' gives the term end). Without "
+        "this the meeting cannot be scheduled, so infer it from the term when stated."
     )
     confidence: Confidence = Field(description=CONFIDENCE_NOTE)
     source_text: str = Field(description=SOURCE_TEXT)
@@ -203,7 +217,7 @@ class ClassCancellation(BaseModel):
     title: str
     date: str | None = Field(description=DATE)
     reason: str | None
-    description: str
+    description: str = Field(description=DESCRIPTION)
     confidence: Confidence = Field(description=CONFIDENCE_NOTE)
     source_text: str = Field(description=SOURCE_TEXT)
 
@@ -230,7 +244,7 @@ class Event(BaseModel):
     )
     end_time: str | None = Field(description=TIME)
     location: str | None
-    description: str
+    description: str = Field(description=DESCRIPTION)
     confidence: Confidence = Field(description=CONFIDENCE_NOTE)
     source_text: str = Field(description=SOURCE_TEXT)
 
@@ -254,11 +268,10 @@ class Task(BaseModel):
     )
     due_date: str | None = Field(
         description=f"{DATE} If the item is listed against a week range rather than a "
-        "single day, use the last day of that range, say so in description, and set "
-        "confidence to medium."
+        "single day, use the last day of that range and set confidence to medium."
     )
     due_time: str | None = Field(description=TIME)
-    description: str
+    description: str = Field(description=DESCRIPTION)
     confidence: Confidence = Field(description=CONFIDENCE_NOTE)
     source_text: str = Field(description=SOURCE_TEXT)
 
@@ -270,11 +283,10 @@ class Reading(BaseModel):
     reading_type: Literal["textbook", "article", "class_notes", "book", "other"]
     due_date: str | None = Field(
         description=f"{DATE} If the reading is listed against a week range rather than "
-        "a single day, use the last day of that range, say so in description, and set "
-        "confidence to medium."
+        "a single day, use the last day of that range and set confidence to medium."
     )
     due_time: str | None = Field(description=TIME)
-    description: str
+    description: str = Field(description=DESCRIPTION)
     confidence: Confidence = Field(description=CONFIDENCE_NOTE)
     source_text: str = Field(description=SOURCE_TEXT)
 
@@ -413,16 +425,22 @@ Rules:
 - Do not invent dates, times, titles, or locations.
 - If information is missing or unclear, use null and explain it in missing_information or warnings.
 - A repeating class goes in class_schedule.meetings, never in events.
-- Give class_schedule.meetings one entry per distinct recurring pattern, with all of that
-  pattern's days grouped into its days_of_week. Only add a second meeting when the class
-  genuinely has another pattern, such as a lab or recitation at a different time.
+- Record every class meeting you can identify, even when some of its details are missing
+  or look wrong. Set the unknown fields to null and say what was missing in
+  missing_information. Never drop a meeting because you could not fill it in completely,
+  and never drop one because a stated time looks like a typo — record it as written.
+- Give each distinct recurring pattern its own entry, with all of that pattern's days
+  grouped into its days_of_week. Lecture, lab, and recitation are separate entries. When
+  one of them is offered as several sections at different times, record every section as
+  its own entry rather than collapsing them or picking one.
 - A week-by-week or dated schedule table lists individual sessions of a meeting you have
   already recorded, not new meetings. Use those rows to find start_date, end_date, exams,
   tasks, and readings. Never add a meeting for a row in that table.
 - Readings go in readings, never in tasks.
 - Do not include an item that has no date, unless it is a repeating class meeting.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
-- If class meeting times are not found, set class_schedule.found to false, meetings to [], and add "Class meeting times not found" to missing_information."""
+- Set class_schedule.found to false only when the syllabus says nothing at all about when
+  the class meets. Finding a meeting but not its times is still found = true."""
 
     request = {
         "model": OPENAI_MODEL,
