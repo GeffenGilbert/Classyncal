@@ -372,6 +372,37 @@ def dedupe_list(items, date_field, type_field):
             kept[kept.index(match)] = item
     return kept
 
+def meeting_detail(meeting):
+    """How much of a meeting is filled in, used to pick between duplicates."""
+    return sum(1 for f in ("start_time", "end_time", "start_date", "end_date", "location")
+               if meeting.get(f))
+
+def dedupe_meetings(meetings):
+    """A class recurring on the same days at the same time is one meeting, however
+    many times the syllabus mentions it. Psyc returns its Monday/Wednesday lecture
+    twice, sometimes with different end dates. Keeps whichever copy is most complete,
+    then whichever runs longer - a truncated end date is the likelier mistake."""
+    kept = []
+    for meeting in meetings:
+        # Location is part of the key: Bio runs two recitation sections at Thursday
+        # 16:50 in different rooms, and they are different sections, not a duplicate.
+        key = (
+            normalized_title(meeting.get("title")),
+            tuple(meeting.get("days_of_week") or []),
+            meeting.get("start_time"),
+            normalized_title(meeting.get("location")),
+        )
+        match = next((i for i, (k, _) in enumerate(kept) if k == key), None)
+        if match is None:
+            kept.append((key, meeting))
+            continue
+        current = kept[match][1]
+        better = (meeting_detail(meeting), meeting.get("end_date") or "") > (
+            meeting_detail(current), current.get("end_date") or "")
+        if better:
+            kept[match] = (key, meeting)
+    return [m for _, m in kept]
+
 DEDUPE_FIELDS = {
     "events": ("date", "event_type"),
     "tasks": ("due_date", "task_type"),
@@ -382,6 +413,9 @@ DEDUPE_FIELDS = {
 def deduplicate(payload):
     for key, (date_field, type_field) in DEDUPE_FIELDS.items():
         payload[key] = dedupe_list(payload.get(key, []), date_field, type_field)
+
+    schedule = payload.setdefault("class_schedule", {})
+    schedule["meetings"] = dedupe_meetings(schedule.get("meetings", []))
 
     # Rule 3. Anything recorded as both an event and a task stays an event.
     event_titles = {normalized_title(e.get("title")) for e in payload["events"]}
