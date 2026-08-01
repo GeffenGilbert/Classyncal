@@ -386,11 +386,16 @@ def dedupe_meetings(meetings):
     for meeting in meetings:
         # Location is part of the key: Bio runs two recitation sections at Thursday
         # 16:50 in different rooms, and they are different sections, not a duplicate.
+        location = normalized_title(meeting.get("location"))
+        # Nothing else can be in the same room at the same time, so a known location
+        # identifies the meeting on its own - which catches the same class recorded
+        # once as "Lecture" and again as "Class". Without a location, fall back to the
+        # title, since two undated, unplaced meetings may genuinely differ.
         key = (
-            normalized_title(meeting.get("title")),
             tuple(meeting.get("days_of_week") or []),
             meeting.get("start_time"),
-            normalized_title(meeting.get("location")),
+            meeting.get("end_time"),
+            location or normalized_title(meeting.get("title")),
         )
         match = next((i for i, (k, _) in enumerate(kept) if k == key), None)
         if match is None:
