@@ -345,7 +345,16 @@ def same_item(a, b, date_field, type_field):
         return False
     if type_field and a.get(type_field) != b.get(type_field):
         return False
-    return bool(GENERIC_TITLE.match(title_a) or GENERIC_TITLE.match(title_b))
+
+    # The generic label must name the same kind of work as the title it is merging
+    # into - "Essay 1" into "Personal Application Essay". Without this, "Questionnaire 1"
+    # merges with "Information Sheet and Written Release Form" purely for sharing a date,
+    # which loses a real item.
+    for generic, other in ((title_a, title_b), (title_b, title_a)):
+        match = GENERIC_TITLE.match(generic)
+        if match and match.group(1) in other:
+            return True
+    return False
 
 def dedupe_list(items, date_field, type_field):
     """Keep one of each item, preferring the longer - and so more descriptive - title."""
@@ -526,8 +535,11 @@ this take up a block of time, or is it a deadline?" first, then pick the list:
   "Tues/Thurs 10am", "TR 450pm-605pm", or "every Monday and Wednesday".
 - events - a one-off thing that occupies a block of time: exams, midterms, finals,
   quizzes, presentations, review sessions, and special class meetings.
-- tasks - work that is due by a deadline: homework, assignments, papers, projects,
-  labs, and problem sets.
+- tasks - anything the student has to complete or hand in by a date. Homework,
+  assignments, papers, projects, labs, problem sets, questionnaires, surveys,
+  discussion posts, reflections, peer reviews, forms to sign and return. These are
+  examples, not a closed list: if a syllabus gives something a date and expects the
+  student to do it, it is a task, whatever it is called.
 - readings - textbook chapters, articles, books, and class notes to read.
 - class_cancellations - "No Class", holidays, breaks, and university closures.
 
@@ -550,9 +562,14 @@ Rules:
   at a fixed time rather than handing them in, so they are not work with a deadline.
 - Readings go in readings, never in tasks.
 - Holidays, breaks, and no-class days go in class_cancellations, never in events.
-- Only record scheduled work and dated events. Policy text - make-up rules, grading
-  breakdowns, contact instructions, attendance rules - is not an item. Do not turn it
-  into a task because it describes something a student might have to do.
+- Be comprehensive. Every dated thing the student has to do, attend, or hand in belongs
+  in one of the lists. Read the whole syllabus: due dates are often collected on their
+  own page, in a table, or in a checklist near the end, separately from the paragraph
+  that explains them. Work through each such list in full and record every row.
+- Undated policy text is not an item: make-up rules, grading breakdowns, contact
+  instructions, attendance rules. But a policy paragraph does not disqualify the dates
+  it refers to - if the syllabus explains a requirement and lists dates for it anywhere,
+  record one task per date.
 - Do not include an item that has no date, unless it is a repeating class meeting.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
 - If the syllabus has a dated schedule of class meetings, use the first dated regular class meeting as start_date and the last dated regular class meeting as end_date. Mark confidence as medium if inferred.
