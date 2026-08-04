@@ -3,14 +3,14 @@ import ItemRow from "./ItemRow";
 import AddItemButton from "./AddItemButton";
 import { getSortedIndices } from "./sortByDate";
 
-// Shared by the Tasks and Readings tabs, which have the same shape:
-// a title, a due date/time, and a description.
-function DueItemsTab({ items, path, onUpdate, onRemove, onAdd, addLabel }) {
-  const blankItem = { title: "", due_date: "", due_time: "", description: "" };
-
+// Shared by every tab whose items are a deadline rather than a duration:
+// Assignments, Projects, and Readings. `indices` selects which of `items` this
+// tab shows; `blankItem` carries the type field that keeps a newly added item
+// in the tab that created it.
+function DueItemsTab({ items, indices, path, onUpdate, onRemove, onAdd, addLabel, blankItem }) {
   return (
     <div className="flex flex-col">
-      {getSortedIndices(items, "due_date", "due_time").map((index) => {
+      {getSortedIndices(items, "due_date", "due_time", indices).map((index) => {
         const item = items[index];
         return (
           <ItemRow key={item._key} onRemove={() => onRemove(path, index)}>
