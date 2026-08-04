@@ -10,7 +10,7 @@
     "notes": "Recurring class meeting found in Meeting Time and Location. Start and end dates are based on the first and last dated class meetings in the schedule.",
     "meetings": [
       {
-        "title": "CSC 242 Artificial Intelligence",
+        "title": "Lecture",
         "days_of_week": [
           "Tuesday",
           "Thursday"
@@ -43,7 +43,7 @@
       "source_text": "Mar 12 R No Class (Spring Break)"
     }
   ],
-  "calendar_events": [
+  "events": [
     {
       "title": "Review",
       "event_type": "review_session",

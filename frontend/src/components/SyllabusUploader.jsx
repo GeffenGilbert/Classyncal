@@ -6,8 +6,6 @@ import UploadingScreen from "./UploadingScreen";
 const ALLOWED_FILE_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-  "image/png",
-  "image/jpeg", // covers both .jpg and .jpeg
 ];
 
 // Item arrays come straight from the backend with no stable id, but React
@@ -19,7 +17,7 @@ function withStableKeys(data) {
   return {
     ...data,
     class_schedule: { ...data.class_schedule, meetings: addKeys(data.class_schedule.meetings) },
-    calendar_events: addKeys(data.calendar_events),
+    events: addKeys(data.events),
     tasks: addKeys(data.tasks),
     readings: addKeys(data.readings),
   };
@@ -119,8 +117,27 @@ function SyllabusUploader() {
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
-      setExtractedData(withStableKeys(data));
+
+      // If backend returned an error status, surface the error message to the user
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const message = errorData?.message || errorData?.detail || errorData?.error || "Could not upload your syllabus. Please try again.";
+        setUploadError(message);
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      if (!data) {
+        setUploadError("Could not parse server response. Please try again.");
+        return;
+      }
+
+      // Validate shape and protect against unexpected responses
+      try {
+        setExtractedData(withStableKeys(data));
+      } catch {
+        setUploadError("Server returned unexpected data. Please try again or contact support.");
+      }
     } catch (error) {
       console.error("Error uploading syllabus:", error);
       setUploadError("Could not upload your syllabus. Please try again.");
