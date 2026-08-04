@@ -348,8 +348,15 @@ def same_item(a, b, date_field, type_field):
 
     if not date:
         return False
-    if type_field and a.get(type_field) != b.get(type_field):
-        return False
+    # A second, generic listing tends to come with a generic type: Psyc returns its
+    # essays once as "Personal Application Essay" typed 'paper' and again as "Essay 1"
+    # typed 'other'. So the catch-all type agrees with anything, while two specific
+    # types still have to match - an exam and its review session share a name and
+    # sometimes a date, and are not the same thing.
+    if type_field:
+        type_a, type_b = a.get(type_field), b.get(type_field)
+        if type_a != type_b and "other" not in (type_a, type_b):
+            return False
 
     # The generic label must name the same kind of work as the title it is merging
     # into - "Essay 1" into "Personal Application Essay". Without this, "Questionnaire 1"
