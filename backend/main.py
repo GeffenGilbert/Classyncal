@@ -232,7 +232,10 @@ class Event(BaseModel):
         "review_session",
         "special_class",
         "other",
-    ] = Field(description="What kind of event this is. Use 'other' if none fit.")
+    ] = Field(
+        description="What kind of event this is. Use 'other' only when the event belongs "
+        "to this course and none of the named types fit."
+    )
     date: str | None = Field(description=DATE)
     start_time: str | None = Field(
         description=f"{TIME} Leave null if the event falls on a regular class day "
@@ -574,8 +577,9 @@ this take up a block of time, or is it a deadline?" first, then pick the list:
 
 - class_schedule.meetings - a class that repeats every week, such as "MW 2:00-3:15" or
   "every Tuesday and Thursday".
-- events - a one-off thing that occupies a block of time: exams, midterms, finals,
-  quizzes, presentations, review sessions, and special class meetings.
+- events - a one-off thing that occupies a block of time and belongs to this course:
+  exams, midterms, finals, quizzes, presentations, review sessions, and special class
+  meetings.
 - tasks - work that is due by a deadline: homework, assignments, papers, projects,
   labs, and problem sets.
 - readings - textbook chapters, articles, books, and class notes to read. Where a
@@ -606,8 +610,12 @@ Rules:
 - A break spanning several days becomes one cancellation for each day the class would
   otherwise have met - not one entry for the whole range, and not one per calendar day.
 - Only record scheduled work and dated events. Policy text - make-up rules, grading
-  breakdowns, contact instructions - is not an item, however much it describes something
-  a student must do.
+  breakdowns, contact instructions, honor-code pledges, attendance requirements - is not
+  an item, however much it describes something a student must do.
+- Every item must be something this course scheduled. A date the university sets for all
+  students - a break, a holiday, an add/drop or withdrawal deadline, a pass/fail or
+  grading-option deadline, a registration window, reading days, commencement - goes in no
+  list at all, except that a break stopping this class from meeting is a cancellation.
 - Do not include an item that has no date, unless it is a repeating class meeting.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
 - Take start_date and end_date from the first and last dated class meetings where the
