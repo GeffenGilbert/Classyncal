@@ -617,6 +617,11 @@ Rules:
   grading-option deadline, a registration window, reading days, commencement - goes in no
   list at all, except that a break stopping this class from meeting is a cancellation.
 - Do not include an item that has no date, unless it is a repeating class meeting.
+- Record one item per dated occurrence, and never one item standing in for several. A
+  syllabus saying homework is assigned weekly without listing the weeks yields no tasks
+  at all - not one called "Homework Assignments" - and the same goes for "Weekly Quizzes"
+  or "Discussion Posts". Say so in warnings instead. Outside class_schedule.meetings,
+  every item covers exactly one date.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
 - Take start_date and end_date from the first and last dated class meetings where the
   syllabus has a dated schedule, otherwise from whatever states the term's span. Mark
