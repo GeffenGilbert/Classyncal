@@ -59,22 +59,6 @@ const TAB_CONFIG = [
     },
   },
   {
-    id: "events",
-    label: "Other Events",
-    path: "events",
-    match: (item) => !isTest(item),
-    addLabel: "Add event",
-    blank: {
-      title: "",
-      event_type: "other",
-      date: "",
-      start_time: "",
-      end_time: "",
-      location: "",
-      description: "",
-    },
-  },
-  {
     id: "assignments",
     label: "Assignments",
     path: "tasks",
@@ -96,6 +80,24 @@ const TAB_CONFIG = [
     path: "readings",
     addLabel: "Add reading",
     blank: { title: "", reading_type: "other", due_date: "", due_time: "", description: "" },
+  },
+  // Last on purpose: this is the catch-all for events no other tab claimed, so it is
+  // the least predictable list and the one a user is most likely to skim.
+  {
+    id: "events",
+    label: "Other Events",
+    path: "events",
+    match: (item) => !isTest(item),
+    addLabel: "Add event",
+    blank: {
+      title: "",
+      event_type: "other",
+      date: "",
+      start_time: "",
+      end_time: "",
+      location: "",
+      description: "",
+    },
   },
 ];
 
