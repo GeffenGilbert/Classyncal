@@ -372,41 +372,85 @@ def dedupe_list(items, date_field, type_field):
             kept[kept.index(match)] = item
     return kept
 
-def meeting_detail(meeting):
-    """How much of a meeting is filled in, used to pick between duplicates."""
-    return sum(1 for f in ("start_time", "end_time", "start_date", "end_date", "location")
-               if meeting.get(f))
+CONFIDENCE_RANK = {"high": 0, "medium": 1, "low": 2}
+WEEKDAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+                 "Saturday", "Sunday"]
+
+def compatible(a, b):
+    """Two values describe the same thing when they agree or one is simply absent."""
+    return not a or not b or a == b
+
+def same_meeting(a, b):
+    """Whether two entries describe one class meeting. Matching on agreement rather
+    than equality is what merges a schedule the model split in two - the syllabus
+    states the lecture's days and times in one place and its date range in another, so
+    neither copy is a duplicate of the other but together they are one meeting.
+
+    One day set inside the other counts as agreement, because the other way a schedule
+    splits is per day: a Monday/Wednesday lecture returned again as a bare Monday entry
+    and a bare Wednesday entry. A genuinely separate session on one of those days -
+    a Wednesday lab, an extra Friday hour - differs in title, room or time, and every
+    one of those still has to agree below."""
+    days_a = set(a.get("days_of_week") or [])
+    days_b = set(b.get("days_of_week") or [])
+    if not (days_a <= days_b or days_b <= days_a):
+        return False
+    if not compatible(a.get("start_time"), b.get("start_time")):
+        return False
+    if not compatible(a.get("end_time"), b.get("end_time")):
+        return False
+
+    # Location must agree: Bio runs two recitation sections at Thursday 16:50 in
+    # different rooms, and they are different sections, not a duplicate.
+    location_a = normalized_title(a.get("location"))
+    location_b = normalized_title(b.get("location"))
+    if not compatible(location_a, location_b):
+        return False
+    # Nothing else can be in the same room at the same time, so two known and equal
+    # locations settle it - which catches the same class recorded once as "Lecture"
+    # and again as "Class". Otherwise the titles have to agree too, since two
+    # untimed, unplaced meetings may genuinely differ.
+    if location_a and location_b:
+        return True
+    return compatible(normalized_title(a.get("title")), normalized_title(b.get("title")))
+
+def merge_meetings(a, b):
+    """One meeting carrying whatever either copy knew. Takes the widest date range:
+    a truncated end date is the likelier mistake, and the same holds of a start date
+    that begins mid-term."""
+    merged = dict(a)
+    for field in ("start_time", "end_time", "location", "source_text"):
+        merged[field] = a.get(field) or b.get(field)
+    # Keep every day either copy knew about, in the schedule's own order.
+    days = list(a.get("days_of_week") or [])
+    days += [d for d in (b.get("days_of_week") or []) if d not in days]
+    merged["days_of_week"] = sorted(days, key=WEEKDAY_ORDER.index)
+    # Prefer the more descriptive of two disagreeing titles, as dedupe_list does.
+    merged["title"] = max((a.get("title") or "", b.get("title") or ""), key=len)
+    merged["start_date"] = min(filter(None, (a.get("start_date"), b.get("start_date"))),
+                               default=None)
+    merged["end_date"] = max(filter(None, (a.get("end_date"), b.get("end_date"))),
+                             default=None)
+    # A merged meeting is partly assembled, so it is only as trustworthy as its
+    # weaker half.
+    merged["confidence"] = max(
+        (a.get("confidence"), b.get("confidence")),
+        key=lambda c: CONFIDENCE_RANK.get(c, 0),
+    )
+    return merged
 
 def dedupe_meetings(meetings):
     """A class recurring on the same days at the same time is one meeting, however
     many times the syllabus mentions it. Psyc returns its Monday/Wednesday lecture
-    twice, sometimes with different end dates. Keeps whichever copy is most complete,
-    then whichever runs longer - a truncated end date is the likelier mistake."""
+    twice, sometimes with different end dates."""
     kept = []
     for meeting in meetings:
-        # Location is part of the key: Bio runs two recitation sections at Thursday
-        # 16:50 in different rooms, and they are different sections, not a duplicate.
-        location = normalized_title(meeting.get("location"))
-        # Nothing else can be in the same room at the same time, so a known location
-        # identifies the meeting on its own - which catches the same class recorded
-        # once as "Lecture" and again as "Class". Without a location, fall back to the
-        # title, since two undated, unplaced meetings may genuinely differ.
-        key = (
-            tuple(meeting.get("days_of_week") or []),
-            meeting.get("start_time"),
-            meeting.get("end_time"),
-            location or normalized_title(meeting.get("title")),
-        )
-        match = next((i for i, (k, _) in enumerate(kept) if k == key), None)
+        match = next((i for i, k in enumerate(kept) if same_meeting(meeting, k)), None)
         if match is None:
-            kept.append((key, meeting))
-            continue
-        current = kept[match][1]
-        better = (meeting_detail(meeting), meeting.get("end_date") or "") > (
-            meeting_detail(current), current.get("end_date") or "")
-        if better:
-            kept[match] = (key, meeting)
-    return [m for _, m in kept]
+            kept.append(meeting)
+        else:
+            kept[match] = merge_meetings(kept[match], meeting)
+    return kept
 
 DEDUPE_FIELDS = {
     "events": ("date", "event_type"),
