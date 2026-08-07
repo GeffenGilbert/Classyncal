@@ -6,3 +6,6 @@ python-multipart
 google-auth-oauthlib
 google-api-python-client
 python-docx
+sqlalchemy
+alembic
+psycopg[binary]
