@@ -1,9 +1,14 @@
 # Syllabus Calendar Project
 
 A web app that turns a syllabus PDF into Google Calendar events and Google Tasks. The
-current session's focus is rebuilding the frontend into something clean, professional,
-and aesthetic — the backend flow and API contract are already working and should be
-treated as stable unless a frontend change requires a small backend adjustment.
+frontend was already rebuilt into something clean, professional, and aesthetic. The
+current focus is deploying the app (VPS + Docker Compose, targeting up to ~100
+concurrent users): moving off the single-file `token.json` OAuth storage to per-user
+Postgres-backed sessions, moving the synchronous OpenAI call onto a Redis/arq background
+worker so `/upload-syllabus` returns a `job_id` immediately, and containerizing the
+whole stack behind an HTTPS reverse proxy. The API contract described below (request/
+response shapes) is stable and should not change as part of this work unless a step
+specifically requires it.
 
 ## User flow (this is what the UI must support end to end)
 
@@ -32,16 +37,22 @@ treated as stable unless a frontend change requires a small backend adjustment.
 - `frontend/` — Vite + React 19 (JSX, not TypeScript despite `tsc` in the `dev`/`build`
   scripts — there is currently no actual TS source). Talks to the backend at
   `http://localhost:8000` (hardcoded absolute URLs today).
-- `backend/` — FastAPI (`backend/main.py`), single file. Uses OpenAI (model set by the
-  `OPENAI_MODEL` env var) with Structured Outputs to extract data from the uploaded
-  syllabus, and the Google Calendar/Tasks APIs to write events. Run via
-  `uvicorn main:app --reload` from `backend/` with the venv active (see comment at top
-  of `main.py`). CORS allows any `localhost`/`127.0.0.1` port in the 5170–5179 range,
-  since Vite moves ports when 5173 is taken.
-- The `SyllabusExtraction` Pydantic model in `main.py` **is** the data model — Structured
-  Outputs guarantees the response matches it, so the schema is the contract, not
-  something the prompt has to enforce. `backend/format.json` is a real example of that
-  same shape, which `/add-events` accepts back. Top-level keys: `course`,
+- `backend/` — FastAPI, as an `app/` package (`backend/main.py` is a thin entrypoint,
+  `from app.main import app`, kept only so `uvicorn main:app --reload` from `backend/`
+  with the venv active still works as documented). Layout: `app/main.py` builds the
+  `FastAPI()` instance, sets up CORS, and registers routers; `app/config.py` holds env
+  vars and `.env` loading; `app/routers/` has one module per route group (`health`,
+  `auth`, `syllabus`, `events`); `app/services/` holds the logic each router calls into
+  (`dedupe.py`, `titling.py`, `document_parsing.py`, `openai_extraction.py`,
+  `google_sync.py`); `app/schemas/extraction.py` holds the Pydantic models. Uses OpenAI
+  (model set by the `OPENAI_MODEL` env var) with Structured Outputs to extract data from
+  the uploaded syllabus, and the Google Calendar/Tasks APIs to write events. CORS allows
+  any `localhost`/`127.0.0.1` port in the 5170–5179 range, since Vite moves ports when
+  5173 is taken.
+- The `SyllabusExtraction` Pydantic model in `app/schemas/extraction.py` **is** the data
+  model — Structured Outputs guarantees the response matches it, so the schema is the
+  contract, not something the prompt has to enforce. `backend/format.json` is a real
+  example of that same shape, which `/add-events` accepts back. Top-level keys: `course`,
   `class_schedule` (recurring meetings), `class_cancellations`, `events`, `tasks`,
   `readings`, `missing_information`, `warnings`. Every extracted item carries a
   `confidence` (`high`/`medium`/`low`) and a `source_text` snippet — these are worth
@@ -69,9 +80,9 @@ Two consequences worth knowing:
   an item belongs in; date formats, week-range inference, and `source_text` rules sit on
   the fields themselves.
 
-Course codes are prefixed onto every title (`"CSC 242: Midterm 1"`) by `titled()` in the
-sync layer, not by the model — so it applies uniformly and cannot drift with phrasing.
-The model is told to return bare titles.
+Course codes are prefixed onto every title (`"CSC 242: Midterm 1"`) by `titled()` in
+`app/services/titling.py`, not by the model — so it applies uniformly and cannot drift
+with phrasing. The model is told to return bare titles.
 
 ## Frontend layout
 
