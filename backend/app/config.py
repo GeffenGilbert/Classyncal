@@ -14,6 +14,12 @@ OPENAI_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT")
 OPENAI_PDF_DETAIL = os.getenv("OPENAI_PDF_DETAIL", "auto")
 MAX_DOCUMENT_CHARS = int(os.getenv("MAX_DOCUMENT_CHARS", "600000"))
 
+# Matches the local `syllabus-postgres` Docker container. Overridden via .env
+# in any environment where the database lives somewhere else (e.g. the VPS).
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql+psycopg://syllabus:syllabus@localhost:5432/syllabus"
+)
+
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/tasks"
