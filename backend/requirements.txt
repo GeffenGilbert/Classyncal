@@ -9,3 +9,4 @@ python-docx
 sqlalchemy
 alembic
 psycopg[binary]
+cryptography

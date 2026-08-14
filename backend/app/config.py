@@ -20,6 +20,10 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql+psycopg://syllabus:syllabus@localhost:5432/syllabus"
 )
 
+# No hardcoded fallback on purpose - unlike DATABASE_URL, a convenient default here
+# would mean every environment that forgets to set it shares the same well-known key.
+TOKEN_ENCRYPTION_KEY = os.getenv("TOKEN_ENCRYPTION_KEY")
+
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/tasks"
