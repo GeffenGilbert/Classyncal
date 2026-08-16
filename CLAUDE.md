@@ -12,9 +12,38 @@ specifically requires it.
 
 Progress so far: the Postgres schema and Alembic migrations are done (see "Database
 layer" below). The auth rework (replacing `token.json` with the `users`/`google_tokens`/
-`sessions` tables) is in progress — `app/services/session.py` has the session-cookie
-dependency; the OAuth routes themselves haven't been rewired to use it yet. The Redis/arq
-job queue, async route conversion, and containerization haven't been started.
+`sessions` tables) is in progress — `app/services/session.py` (session-cookie dependency)
+and `app/services/token_crypto.py` (Fernet encryption for stored tokens) are done;
+`/auth/google` and `/auth/google/callback` in `app/routers/auth.py` are rewired to use
+them. The Redis/arq job queue, async route conversion, and containerization haven't been
+started.
+
+### Remaining coding-side work (deployment)
+
+Cloud infra (VPS choice, Docker Compose, reverse proxy, domain/DNS) is being handled
+separately — this list is backend/frontend code only, roughly in order:
+
+1. **Finish the auth rework** — a helper that turns a `user_id` into usable Google
+   `Credentials` (decrypt stored tokens, refresh if `expires_at` is within 5 minutes,
+   delete the `google_tokens` row and signal 401 on `invalid_grant`), wire `/add-events`
+   to use it instead of `token.json`, then remove `token.json` entirely (the write in the
+   callback, the read in `/add-events`, the `/test-calendar` debug route) and require a
+   logged-in session for `/add-events`.
+2. **Connection-status endpoint** — e.g. `GET /auth/status`, so the frontend can ask
+   "is Google connected for this session" instead of inferring it from a local file.
+3. **Redis/arq job queue** — convert `/upload-syllabus` to enqueue a job and return a
+   `job_id` immediately instead of blocking on the OpenAI call, add a job-status polling
+   endpoint, move the extraction logic into an arq worker task.
+4. **Expired-session cleanup** — the periodic-cleanup logic itself (arq periodic task or
+   standalone script) for the known follow-up noted below; how it gets scheduled on the
+   box is infra, not this.
+5. **Frontend updates** — poll a `job_id` instead of awaiting one request/response for
+   upload, wire the "is Google connected" UI to the new status endpoint, handle the
+   401-needs-reconnect case from `/add-events`.
+6. **Production-readiness cleanup** — things currently hardcoded for local dev need to
+   become env-driven: `OAUTHLIB_INSECURE_TRANSPORT` override in `config.py` (already
+   flagged there), the OAuth `redirect_uri` (hardcoded to `localhost:8000`), the session
+   cookie's `secure=False`, and the CORS origin regex (localhost-only).
 
 ## User flow (this is what the UI must support end to end)
 
