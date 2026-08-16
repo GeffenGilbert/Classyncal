@@ -25,6 +25,7 @@ DATABASE_URL = os.getenv(
 TOKEN_ENCRYPTION_KEY = os.getenv("TOKEN_ENCRYPTION_KEY")
 
 SCOPES = [
+    "openid",
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/tasks"
 ]
