@@ -38,7 +38,7 @@ function SyllabusUploader() {
   function connectGoogleAndRetry(payload) {
     pendingPayloadRef.current = payload;
     window.open(
-      "http://localhost:8000/auth/google",
+      "/auth/google",
       "google-auth-popup",
       "width=500,height=700"
     );
@@ -49,7 +49,7 @@ function SyllabusUploader() {
     setAddToCalendarError("");
 
     try {
-      const response = await fetch("http://localhost:8000/add-events", {
+      const response = await fetch("/add-events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -113,7 +113,7 @@ function SyllabusUploader() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      const response = await fetch("http://localhost:8000/upload-syllabus", {
+      const response = await fetch("/upload-syllabus", {
         method: "POST",
         body: formData,
       });
