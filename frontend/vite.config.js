@@ -10,6 +10,7 @@ export default defineConfig({
       "/upload-syllabus": "http://localhost:8000",
       "/add-events": "http://localhost:8000",
       "/auth": "http://localhost:8000",
+      "/jobs": "http://localhost:8000",
     },
   },
 })
