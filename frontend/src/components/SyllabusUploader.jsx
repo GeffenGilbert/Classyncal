@@ -104,7 +104,7 @@ function SyllabusUploader() {
 
   useEffect(() => {
     function handleMessage(event) {
-      if (event.origin !== "http://localhost:8000") return;
+      if (event.origin !== import.meta.env.VITE_BACKEND_ORIGIN) return;
       if (event.data?.type !== "google-auth-success") return;
 
       const payload = pendingPayloadRef.current;
