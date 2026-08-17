@@ -5,7 +5,7 @@ from arq.connections import RedisSettings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import REDIS_URL
+from app.config import CORS_ORIGIN_REGEX, REDIS_URL
 from app.routers import auth, events, health, syllabus
 from app.services.session import SessionCookieMiddleware
 
@@ -20,7 +20,7 @@ app = FastAPI(lifespan=lifespan)
 # Allows the React frontend to talk to this backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):517[0-9]",
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -7,7 +7,7 @@ from google.oauth2 import id_token
 from google_auth_oauthlib.flow import Flow
 from sqlalchemy.orm import Session as DBSession
 
-from app.config import SCOPES
+from app.config import BACKEND_BASE_URL, FRONTEND_BASE_URL, SCOPES
 from app.db.base import get_db
 from app.db.models import GoogleToken, Session as BrowserSession, User
 from app.services.session import get_session
@@ -23,7 +23,7 @@ def google_auth(
     flow = Flow.from_client_secrets_file(
         "credentials.json",
         scopes=SCOPES,
-        redirect_uri="http://localhost:8000/auth/google/callback",
+        redirect_uri=f"{BACKEND_BASE_URL}/auth/google/callback",
         autogenerate_code_verifier=False
     )
 
@@ -59,7 +59,7 @@ def google_auth_callback(
     flow = Flow.from_client_secrets_file(
         "credentials.json",
         scopes=SCOPES,
-        redirect_uri="http://localhost:8000/auth/google/callback",
+        redirect_uri=f"{BACKEND_BASE_URL}/auth/google/callback",
         autogenerate_code_verifier=False
     )
     
@@ -108,17 +108,17 @@ def google_auth_callback(
     db.commit()
 
     return HTMLResponse(
-            content="""
+            content=f"""
             <!doctype html>
             <html>
                 <body>
                     <script>
-                        if (window.opener) {
-                            window.opener.postMessage({ type: 'google-auth-success' }, 'http://localhost:5173');
+                        if (window.opener) {{
+                            window.opener.postMessage({{ type: 'google-auth-success' }}, '{FRONTEND_BASE_URL}');
                             window.close();
-                        } else {
+                        }} else {{
                             document.body.textContent = 'Google account connected successfully. You can close this window.';
-                        }
+                        }}
                     </script>
                 </body>
             </html>

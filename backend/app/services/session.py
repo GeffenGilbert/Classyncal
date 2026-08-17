@@ -5,6 +5,7 @@ from fastapi import Request, Depends
 from sqlalchemy.orm import Session as DBSession
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.config import IS_PRODUCTION
 from app.db.base import get_db
 from app.db.models import Session as BrowserSession
 
@@ -52,7 +53,7 @@ class SessionCookieMiddleware(BaseHTTPMiddleware):
                 value=new_session_id,
                 httponly=True,
                 samesite="lax",
-                secure=False,
+                secure=IS_PRODUCTION,
                 max_age=int(SESSION_LIFETIME.total_seconds()),
             )
 
