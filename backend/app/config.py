@@ -24,6 +24,10 @@ DATABASE_URL = os.getenv(
 # would mean every environment that forgets to set it shares the same well-known key.
 TOKEN_ENCRYPTION_KEY = os.getenv("TOKEN_ENCRYPTION_KEY")
 
+# Matches the local `syllabus-redis` Docker container. Overridden via .env
+# in any environment where Redis lives somewhere else (e.g. the VPS).
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/calendar.events",

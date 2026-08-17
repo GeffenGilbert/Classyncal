@@ -1,10 +1,21 @@
+from contextlib import asynccontextmanager
+
+from arq import create_pool
+from arq.connections import RedisSettings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import REDIS_URL
 from app.routers import auth, events, health, syllabus
 from app.services.session import SessionCookieMiddleware
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.redis = await create_pool(RedisSettings.from_dsn(REDIS_URL))
+    yield
+    await app.state.redis.aclose()
+
+app = FastAPI(lifespan=lifespan)
 
 # Allows the React frontend to talk to this backend
 app.add_middleware(

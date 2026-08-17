@@ -1,7 +1,11 @@
-from fastapi import APIRouter, UploadFile, File
+import uuid
+
+from fastapi import APIRouter, Depends, Request, UploadFile, File
+from sqlalchemy.orm import Session as DBSession
 
 from app.config import OPENAI_API_KEY
-from app.services.dedupe import deduplicate
+from app.db.base import get_db
+from app.db.models import Job, Session as BrowserSession
 from app.services.document_parsing import (
     ALLOWED_CONTENT_TYPES,
     DOCX_CONTENT_TYPE,
@@ -9,14 +13,18 @@ from app.services.document_parsing import (
     make_pdf_input_content,
     make_text_input_content,
 )
-from app.services.openai_extraction import extract_syllabus
-from app.services.titling import apply_course_code
+from app.services.session import get_session
 from app.utils import error_response
 
 router = APIRouter()
 
 @router.post("/upload-syllabus")
-async def upload_syllabus(file: UploadFile = File(...)):
+async def upload_syllabus(
+    request: Request,
+    file: UploadFile = File(...),
+    session: BrowserSession = Depends(get_session),
+    db: DBSession = Depends(get_db)
+):
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         return error_response(
             415,
@@ -57,21 +65,25 @@ async def upload_syllabus(file: UploadFile = File(...)):
         document_text = f"Here is the text extracted from the syllabus document, including any tables converted to markdown:\n\n{extracted_text}"
         input_content = make_text_input_content(document_text)
 
-    try:
-        parsed = extract_syllabus(input_content)
-    except Exception:
-        return error_response(
-            502,
-            "openai_request_failed",
-            "OpenAI could not process the extracted syllabus text. Please try again.",
-        )
+    job = Job(session_id=session.session_id)
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    
+    await request.app.state.redis.enqueue_job(
+        "extract_syllabus_job",
+        job.job_id,
+        input_content,
+        _job_id=str(job.job_id),
+    )
 
-    if not parsed:
-        return error_response(
-            502,
-            "invalid_model_response",
-            "Model returned an unexpected response shape.",
-        )
+    return {"job_id": str(job.job_id)}
 
-    # Deduplicate before prefixing, so the course code does not mask a generic title.
-    return apply_course_code(deduplicate(parsed.model_dump(mode="json")))
+@router.get("/jobs/{job_id}")
+def get_job_status(job_id: uuid.UUID, db: DBSession = Depends(get_db)):
+    job = db.get(Job, job_id)
+    
+    if job is None:
+        return error_response(404, "job_not_found", "No job found with this id.")
+    
+    return {"status": job.status, "result": job.result_json}

@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from app.config import OPENAI_API_KEY, OPENAI_MODEL, OPENAI_REASONING_EFFORT
 from app.schemas.extraction import SyllabusExtraction
@@ -65,10 +65,10 @@ Rules:
 - Set class_schedule.found to false only when the syllabus says nothing at all about when
   the class meets. Finding a meeting but not its times is still found = true."""
 
-def extract_syllabus(input_content):
+async def extract_syllabus(input_content):
     """Sends the prepared syllabus input to OpenAI and returns the parsed
     SyllabusExtraction, or None if the model returned an unusable response."""
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
     request = {
         "model": OPENAI_MODEL,
@@ -85,5 +85,5 @@ def extract_syllabus(input_content):
     if OPENAI_REASONING_EFFORT:
         request["reasoning"] = {"effort": OPENAI_REASONING_EFFORT}
 
-    response = client.responses.parse(**request)
+    response = await client.responses.parse(**request)
     return response.output_parsed
