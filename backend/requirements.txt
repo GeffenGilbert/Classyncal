@@ -10,3 +10,4 @@ sqlalchemy
 alembic
 psycopg[binary]
 cryptography
+arq
