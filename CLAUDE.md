@@ -33,17 +33,14 @@ cleanup is also done — `app/services/cleanup.py` (`cleanup_expired_sessions`,
 `app/worker.py`, so it runs inside the same worker process with no separate OS-level
 scheduling needed. `cleanup_expired_sessions` deletes an expired session's `jobs` rows
 before the session itself, since `jobs.session_id` is a FK with no `ON DELETE` behavior
-and would otherwise block the delete. Containerization hasn't been started.
+and would otherwise block the delete. Production-readiness cleanup is done too — see
+"Conventions / gotchas" below for the env vars this introduced. Containerization hasn't
+been started.
 
 ### Remaining coding-side work (deployment)
 
-Cloud infra (VPS choice, Docker Compose, reverse proxy, domain/DNS) is being handled
-separately:
-
-1. **Production-readiness cleanup** — things currently hardcoded for local dev need to
-   become env-driven: `OAUTHLIB_INSECURE_TRANSPORT` override in `config.py` (already
-   flagged there), the OAuth `redirect_uri` (hardcoded to `localhost:8000`), the session
-   cookie's `secure=False`, and the CORS origin regex (localhost-only).
+Everything on this list is done. What's left is cloud infra (VPS choice, Docker Compose,
+reverse proxy, domain/DNS, containerization), which is being handled separately.
 
 There is deliberately no "is Google connected" status endpoint: the frontend never checks
 connection state up front. It just calls `/add-events`; a 401 (`not_authenticated`)
@@ -80,8 +77,10 @@ consumer.
 ## Architecture
 
 - `frontend/` — Vite + React 19 (JSX, not TypeScript despite `tsc` in the `dev`/`build`
-  scripts — there is currently no actual TS source). Talks to the backend at
-  `http://localhost:8000` (hardcoded absolute URLs today).
+  scripts — there is currently no actual TS source). API calls use relative URLs,
+  proxied to the backend by Vite's dev server (`server.proxy` in `vite.config.js`) so
+  the browser only ever talks to its own origin — see "Conventions / gotchas" below for
+  why that matters for the session cookie.
 - `backend/` — FastAPI, as an `app/` package (`backend/main.py` is a thin entrypoint,
   `from app.main import app`, kept only so `uvicorn main:app --reload` from `backend/`
   with the venv active still works as documented). Layout: `app/main.py` builds the
@@ -195,8 +194,16 @@ The prototype has been replaced. `App.jsx` is now a thin shell composing `MouseT
 
 ## Conventions / gotchas
 
-- Backend base URL is hardcoded as `http://localhost:8000` in the frontend; the backend
-  accepts any localhost port in 5170–5179 — keep both in sync if ports change.
+- The app's public URLs are env-driven, not hardcoded, via `app/config.py`:
+  `ENVIRONMENT` (default `"development"`; anything else, including `"staging"`, is
+  treated like production for security-relevant defaults — only `"development"` gets
+  the insecure/local ones), `BACKEND_BASE_URL`, and `FRONTEND_BASE_URL`. These build the
+  OAuth `redirect_uri`, the `CORS_ORIGIN_REGEX` default (an exact match on
+  `FRONTEND_BASE_URL` outside development, the broad `5170-5179` localhost range inside
+  it), and the `postMessage` origin checks between the OAuth popup and its opener on
+  both sides — the backend side reads `FRONTEND_BASE_URL`, the frontend side reads its
+  own `VITE_BACKEND_ORIGIN` from `frontend/.env` (a separate var since Vite bakes
+  `VITE_`-prefixed vars in at build time, not runtime).
 - Dates are `YYYY-MM-DD`, times are 24-hour `HH:MM`, both may be `null` when the source
   PDF didn't specify them — the UI needs to handle nulls gracefully (e.g. all-day
   events, tasks with no due time).
