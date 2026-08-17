@@ -8,6 +8,32 @@ const ALLOWED_FILE_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
 ];
 
+const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_POLL_MAX_ATTEMPTS = 60; // ~2 minutes at the interval above
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Extraction runs on a background worker now, so /upload-syllabus only hands
+// back a job_id - this polls /jobs/{job_id} until the worker marks it done
+// or failed, and resolves with the same extracted-data shape the old
+// synchronous response used to return directly.
+async function pollJobStatus(jobId) {
+  for (let attempt = 0; attempt < JOB_POLL_MAX_ATTEMPTS; attempt++) {
+    await sleep(JOB_POLL_INTERVAL_MS);
+
+    const response = await fetch(`/jobs/${jobId}`);
+    if (!response.ok) throw new Error("Could not check upload status. Please try again.");
+
+    const job = await response.json();
+    if (job.status === "done") return job.result;
+    if (job.status === "failed") throw new Error("Could not process your syllabus. Please try again.");
+  }
+
+  throw new Error("This is taking longer than expected. Please try again.");
+}
+
 // Item arrays come straight from the backend with no stable id, but React
 // list rendering needs one that survives removals — using array index as a
 // key makes a component get reused for a different item once an earlier one
@@ -126,11 +152,13 @@ function SyllabusUploader() {
         return;
       }
 
-      const data = await response.json().catch(() => null);
-      if (!data) {
+      const uploadResponse = await response.json().catch(() => null);
+      if (!uploadResponse?.job_id) {
         setUploadError("Could not parse server response. Please try again.");
         return;
       }
+
+      const data = await pollJobStatus(uploadResponse.job_id);
 
       // Validate shape and protect against unexpected responses
       try {
@@ -140,7 +168,7 @@ function SyllabusUploader() {
       }
     } catch (error) {
       console.error("Error uploading syllabus:", error);
-      setUploadError("Could not upload your syllabus. Please try again.");
+      setUploadError(error.message || "Could not upload your syllabus. Please try again.");
     } finally {
       setIsUploading(false);
     }
