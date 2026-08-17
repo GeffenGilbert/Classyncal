@@ -27,18 +27,20 @@ container backs it the same way `syllabus-postgres` backs the DB), a `lifespan` 
 `GET /jobs/{job_id}` polls status/result. `extract_syllabus()` in
 `app/services/openai_extraction.py` is `async` (via `AsyncOpenAI`) so multiple users'
 extractions actually run concurrently on one worker process rather than serializing.
-The frontend polls this too (see "Frontend layout" below). Containerization hasn't been
-started.
+The frontend polls this too (see "Frontend layout" below). Expired-session and old-job
+cleanup is also done — `app/services/cleanup.py` (`cleanup_expired_sessions`,
+`cleanup_old_jobs`), registered as hourly `cron_jobs` on `WorkerSettings` in
+`app/worker.py`, so it runs inside the same worker process with no separate OS-level
+scheduling needed. `cleanup_expired_sessions` deletes an expired session's `jobs` rows
+before the session itself, since `jobs.session_id` is a FK with no `ON DELETE` behavior
+and would otherwise block the delete. Containerization hasn't been started.
 
 ### Remaining coding-side work (deployment)
 
 Cloud infra (VPS choice, Docker Compose, reverse proxy, domain/DNS) is being handled
-separately — this list is backend/frontend code only, roughly in order:
+separately:
 
-1. **Expired-session cleanup** — the periodic-cleanup logic itself (arq periodic task or
-   standalone script) for the known follow-up noted below; how it gets scheduled on the
-   box is infra, not this.
-2. **Production-readiness cleanup** — things currently hardcoded for local dev need to
+1. **Production-readiness cleanup** — things currently hardcoded for local dev need to
    become env-driven: `OAUTHLIB_INSECURE_TRANSPORT` override in `config.py` (already
    flagged there), the OAuth `redirect_uri` (hardcoded to `localhost:8000`), the session
    cookie's `secure=False`, and the CORS origin regex (localhost-only).
@@ -166,10 +168,9 @@ runs) and pulls the connection string from `app.config.DATABASE_URL` rather than
 duplicating it in `alembic.ini`. Applied so far: create the four tables, then a follow-up
 migration making the timestamp columns timezone-aware.
 
-Known follow-up, not yet built: expired `sessions` rows are never deleted, just ignored
-once past `expires_at`. Needs a periodic cleanup job (cron, or an arq periodic task) once
-the app is containerized — not worth a synchronous check-on-every-request, since most
-expired sessions belong to visitors who never come back to trigger one.
+Expired `sessions` rows (and old `jobs` rows) aren't left to accumulate — see the
+`cleanup.py` note above. Not worth a synchronous check-on-every-request instead, since
+most expired sessions belong to visitors who never come back to trigger one.
 
 ## Frontend layout
 
