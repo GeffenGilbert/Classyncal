@@ -12,10 +12,22 @@ specifically requires it.
 
 Progress so far: the Postgres schema and Alembic migrations are done (see "Database
 layer" below). The auth rework (replacing `token.json` with the `users`/`google_tokens`/
-`sessions` tables) is in progress — `app/services/session.py` (session-cookie dependency)
-and `app/services/token_crypto.py` (Fernet encryption for stored tokens) are done;
-`/auth/google` and `/auth/google/callback` in `app/routers/auth.py` are rewired to use
-them. The Redis/arq job queue, async route conversion, and containerization haven't been
+`sessions` tables) is done — `app/services/session.py` (session-cookie dependency, plus
+`SessionCookieMiddleware` so a fresh session's cookie survives routes that return a
+`Response` subclass directly instead of a plain value), `app/services/token_crypto.py`
+(Fernet encryption for stored tokens), and `app/services/google_credentials.py`
+(`get_credentials()` — turns a `user_id` into usable, auto-refreshing Google
+`Credentials`) are all in place; `/auth/google`, `/auth/google/callback`, and
+`/add-events` are fully wired to the DB, and `token.json` has been removed entirely. The
+Redis/arq job queue is also done: `app/worker.py` (`extract_syllabus_job`, run via
+`arq app.worker.WorkerSettings` as its own process — a local `syllabus-redis` Docker
+container backs it the same way `syllabus-postgres` backs the DB), a `lifespan` hook in
+`app/main.py` creates the arq pool on `app.state.redis`, `/upload-syllabus` in
+`app/routers/syllabus.py` enqueues a job and returns `{"job_id": ...}` immediately, and
+`GET /jobs/{job_id}` polls status/result. `extract_syllabus()` in
+`app/services/openai_extraction.py` is `async` (via `AsyncOpenAI`) so multiple users'
+extractions actually run concurrently on one worker process rather than serializing.
+The frontend polls this too (see "Frontend layout" below). Containerization hasn't been
 started.
 
 ### Remaining coding-side work (deployment)
@@ -23,49 +35,45 @@ started.
 Cloud infra (VPS choice, Docker Compose, reverse proxy, domain/DNS) is being handled
 separately — this list is backend/frontend code only, roughly in order:
 
-1. **Finish the auth rework** — a helper that turns a `user_id` into usable Google
-   `Credentials` (decrypt stored tokens, refresh if `expires_at` is within 5 minutes,
-   delete the `google_tokens` row and signal 401 on `invalid_grant`), wire `/add-events`
-   to use it instead of `token.json`, then remove `token.json` entirely (the write in the
-   callback, the read in `/add-events`, the `/test-calendar` debug route) and require a
-   logged-in session for `/add-events`.
-2. **Connection-status endpoint** — e.g. `GET /auth/status`, so the frontend can ask
-   "is Google connected for this session" instead of inferring it from a local file.
-3. **Redis/arq job queue** — convert `/upload-syllabus` to enqueue a job and return a
-   `job_id` immediately instead of blocking on the OpenAI call, add a job-status polling
-   endpoint, move the extraction logic into an arq worker task.
-4. **Expired-session cleanup** — the periodic-cleanup logic itself (arq periodic task or
+1. **Expired-session cleanup** — the periodic-cleanup logic itself (arq periodic task or
    standalone script) for the known follow-up noted below; how it gets scheduled on the
    box is infra, not this.
-5. **Frontend updates** — poll a `job_id` instead of awaiting one request/response for
-   upload, wire the "is Google connected" UI to the new status endpoint, handle the
-   401-needs-reconnect case from `/add-events`.
-6. **Production-readiness cleanup** — things currently hardcoded for local dev need to
+2. **Production-readiness cleanup** — things currently hardcoded for local dev need to
    become env-driven: `OAUTHLIB_INSECURE_TRANSPORT` override in `config.py` (already
    flagged there), the OAuth `redirect_uri` (hardcoded to `localhost:8000`), the session
    cookie's `secure=False`, and the CORS origin regex (localhost-only).
+
+There is deliberately no "is Google connected" status endpoint: the frontend never checks
+connection state up front. It just calls `/add-events`; a 401 (`not_authenticated`)
+triggers the `/auth/google` popup automatically, and success retries the same call. That
+401 check doubles as the connection check, so a separate status endpoint would have no
+consumer.
 
 ## User flow (this is what the UI must support end to end)
 
 1. User lands on the site.
 2. User uploads a syllabus PDF.
 3. User clicks an "upload"/"process" button, which sends the file to the backend
-   (`POST /upload-syllabus`, multipart form with a `file` field, PDF only).
-4. Backend runs the PDF through OpenAI and returns structured JSON matching the shape
-   in `backend/format.json` (see below). This can take a while (real syllabus PDF calls
-   can take from several seconds to well over a minute) — the UI must show a clear
-   loading/processing state, not just a spinner with no feedback that something is
-   still happening.
+   (`POST /upload-syllabus`, multipart form with a `file` field, PDF or DOCX). The route
+   validates the file, creates a `jobs` row, and enqueues the extraction as an arq job,
+   returning `{"job_id": ...}` immediately rather than blocking on OpenAI.
+4. The frontend polls `GET /jobs/{job_id}` (every couple seconds) until `status` is
+   `"done"` (structured JSON matching the shape in `backend/format.json`, see below) or
+   `"failed"`. Real syllabus PDF calls can take from several seconds to well over a
+   minute — the UI must show a clear loading/processing state for the whole poll, not
+   just a spinner with no feedback that something is still happening.
 5. User reviews the returned data: class schedule, one-off calendar events, tasks,
    readings, cancellations, plus `missing_information` and `warnings`. User can edit
    names/dates/times, remove items they don't want, and (eventually) add new items.
 6. User clicks "Add to Calendar". The (possibly edited) JSON is sent back to the backend
    (`POST /add-events`, JSON body = the same document shape) which creates the events/
    tasks in the user's Google Calendar and Google Tasks.
-7. Before step 6 can succeed the user must have connected their Google account
-   (`GET /auth/google` opens a popup OAuth flow; backend stores `token.json` and the
-   popup posts a `google-auth-success` message back to the opener, then closes itself).
-   The UI should make it obvious whether Google is connected yet.
+7. Before step 6 can succeed the user must have connected their Google account. This is
+   handled reactively, not with an upfront status check: if `/add-events` returns 401
+   (`not_authenticated`), the frontend opens `GET /auth/google` in a popup, which runs
+   the OAuth flow, upserts the `users`/`google_tokens` rows, and posts a
+   `google-auth-success` message back to the opener before closing itself; the opener's
+   listener then retries the same `/add-events` call with the pending payload.
 
 ## Architecture
 
@@ -171,10 +179,13 @@ The prototype has been replaced. `App.jsx` is now a thin shell composing `MouseT
 (there is no `App.css` and no `tailwind.config.js` — v4 configures via `@theme` in CSS).
 
 - `SyllabusUploader.jsx` owns the whole flow: file select/drag, the `POST` to
-  `/upload-syllabus`, the `UploadingScreen` while it runs, and then `ReviewModal`. It
-  also adds a `_key` to every item on arrival (`withStableKeys`) because backend items
-  have no stable id and React reuses components across removals without one. `_key` is
-  stripped before the payload goes back to `/add-events`.
+  `/upload-syllabus`, then `pollJobStatus()` calling `GET /jobs/{job_id}` on an interval
+  (capped at `JOB_POLL_MAX_ATTEMPTS` so a stuck job surfaces an error instead of polling
+  forever) until the job is `done` or `failed`, showing `UploadingScreen` the whole time,
+  and then `ReviewModal`. It also adds a `_key` to every item on arrival
+  (`withStableKeys`) because backend items have no stable id and React reuses components
+  across removals without one. `_key` is stripped before the payload goes back to
+  `/add-events`.
 - `components/review/` holds the editing UI: `ReviewModal` drives a select → per-tab
   review → color-pick → confirm sequence, and delegates rows to `ClassScheduleTab`,
   `EventsTab` (one-off, date + time range + location), and `DueItemsTab` (deadline
