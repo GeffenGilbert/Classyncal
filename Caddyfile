@@ -1,0 +1,63 @@
+# Shared proxy settings: the extraction call can run well over a minute, and
+# Caddy's defaults would cut off a request that is still legitimately working.
+(backend) {
+	reverse_proxy api:8000 {
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+}
+
+# The canonical site: one origin serving both the SPA and the API. The frontend
+# fetches relative paths ("/upload-syllabus", "/jobs/..."), so same-origin is
+# not a convenience here - it is what the client code assumes. It also means no
+# CORS config and no cross-site cookie rules to get wrong.
+{$APP_ADDRESS} {
+	request_body {
+		max_size 25MB
+	}
+
+	# Every backend route, mirroring the dev proxy in vite.config.js.
+	@backend path /upload-syllabus* /add-events* /auth* /jobs* /health
+	handle @backend {
+		import backend
+	}
+
+	# Anything else is the SPA. try_files falls back to index.html so a deep
+	# link or a refresh does not 404 against a client-side route.
+	handle {
+		root * /srv
+		# {path}/index.html first so /privacy and /terms resolve to their real
+		# static pages; without it the SPA fallback would serve the uploader UI
+		# at those URLs, which a verification reviewer would reject.
+		try_files {path} {path}/index.html /index.html
+		file_server
+	}
+
+	encode gzip
+	log {
+		output stdout
+		format console
+	}
+}
+
+# One canonical hostname, everything else redirects to it. Two live copies of
+# the same app would mean two OAuth origins and two "home pages" for Google
+# verification to disagree about.
+{$REDIRECT_ADDRESSES} {
+	redir https://{$APP_ADDRESS}{uri} permanent
+}
+
+# API-only hostname, kept so the backend stays addressable on its own.
+{$SITE_ADDRESS} {
+	request_body {
+		max_size 25MB
+	}
+	import backend
+	encode gzip
+	log {
+		output stdout
+		format console
+	}
+}

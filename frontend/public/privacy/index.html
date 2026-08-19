@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Privacy Policy — Classyncal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #1a1a1a; }
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.3rem; margin-top: 2rem; }
+  .updated { color: #666; font-size: 0.9rem; }
+  ul { padding-left: 1.4rem; }
+  .brand { display: flex; align-items: center; gap: .6rem; margin-bottom: 1.5rem; }
+  .brand img { width: 32px; height: 32px; border-radius: 6px; }
+  .brand a { font-weight: 600; color: #1a1a1a; text-decoration: none; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e5e5; font-size: .9rem; color: #666; }
+</style>
+</head>
+<body>
+
+<div class="brand">
+  <img src="/logo.png" alt="">
+  <a href="/">Classyncal</a>
+</div>
+
+<h1>Privacy Policy</h1>
+<p class="updated">Last updated: August 19, 2026</p>
+
+<p>Classyncal ("we", "our", "the app") is a tool that reads uploaded course syllabi and helps you add assignments, exams, and other dates to your Google Calendar and Google Tasks. This policy explains what data we collect, why, and how we handle it.</p>
+
+<h2>Information we collect</h2>
+<ul>
+  <li><strong>Syllabus content you upload.</strong> When you upload a syllabus, its content is sent to OpenAI's API to extract dates, assignments, and other schedule items into a structured format.</li>
+  <li><strong>Google account data (via Google OAuth).</strong> When you sign in with Google, we request access to:
+    <ul>
+      <li><em>Google Calendar</em> — to create calendar events for the items you approve.</li>
+      <li><em>Google Tasks</em> — to create task entries for the items you approve.</li>
+    </ul>
+    We do not request access to your email, contacts, files in Drive, or any other Google data beyond these scopes.
+  </li>
+  <li><strong>Authorization tokens.</strong> We store the OAuth token issued by Google so you don't have to sign in every time you use the app. It is encrypted at rest on our server and is used only to make the Calendar and Tasks API calls you initiate.</li>
+  <li><strong>A session identifier.</strong> A cookie that lets us associate an upload with the browser that started it. It contains no personal information.</li>
+</ul>
+
+<h2>How we use this information</h2>
+<ul>
+  <li>To parse your syllabus into a reviewable list of dates and assignments.</li>
+  <li>To create the calendar events and tasks you explicitly approve after reviewing the parsed content.</li>
+  <li>We do not use your Google data for advertising, profiling, or any purpose unrelated to the syllabus-to-calendar functionality described above.</li>
+</ul>
+
+<h2>How we share information</h2>
+<p>We do not sell or share your Google user data with third parties, except:</p>
+<ul>
+  <li><strong>OpenAI</strong> — the content of your uploaded syllabus (not your Google account data) is sent to OpenAI's API for parsing, subject to <a href="https://openai.com/policies/privacy-policy">OpenAI's privacy policy</a>.</li>
+  <li>As required by law.</li>
+</ul>
+
+<h2>Data retention</h2>
+<ul>
+  <li><strong>The file you upload</strong> is held only in memory and in our processing queue while it is being parsed. It is never written to disk, and the queue is not persisted, so it does not survive a restart of our service.</li>
+  <li><strong>The extracted result</strong> — the structured list of dates and assignments — is stored so you can review it, and is automatically deleted <strong>24 hours after upload</strong>.</li>
+  <li><strong>Your session</strong> expires after 30 days, at which point it and any associated records are deleted.</li>
+  <li><strong>Your Google authorization token</strong> is retained until you revoke access or request deletion.</li>
+</ul>
+
+<h2>Your controls</h2>
+<ul>
+  <li>You can revoke this app's access to your Google account at any time via your <a href="https://myaccount.google.com/permissions">Google Account permissions page</a>. Doing so deletes the token we hold.</li>
+  <li>You can request deletion of any data we hold by contacting us at the email below.</li>
+</ul>
+
+<h2>Google API Services User Data Policy</h2>
+<p>Classyncal's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+<h2>Changes to this policy</h2>
+<p>We may update this policy from time to time. Material changes will be reflected by updating the "Last updated" date above.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy or your data: <a href="mailto:classyncalofficial@gmail.com">classyncalofficial@gmail.com</a></p>
+
+<footer>
+  <a href="/">Classyncal</a> &middot; <a href="/terms/">Terms of Service</a>
+</footer>
+
+</body>
+</html>
