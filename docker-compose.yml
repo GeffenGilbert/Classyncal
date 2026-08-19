@@ -1,0 +1,134 @@
+# Only caddy publishes ports. postgres and redis are reachable over the Compose
+# network by service name and are never exposed to the internet - which is why
+# there is no firewall rule to get wrong for them.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-syllabus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-syllabus}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # Without this, `depends_on` only waits for the container to start, not
+      # for Postgres to accept connections - so migrations race the database
+      # and fail on a cold boot.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-syllabus} -d ${POSTGRES_DB:-syllabus}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # No persistence on purpose. Redis carries arq's queue; the `jobs` table in
+    # Postgres is the source of truth for status and results, so a Redis restart
+    # costs at most the jobs currently in flight, not any durable state.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Runs once per `up` and exits. api waits for it to finish successfully, so
+  # the schema is always current before any request is served, and a failed
+  # migration stops the deploy instead of leaving a half-migrated database
+  # serving traffic.
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    volumes:
+      # Bind-mounted, never baked into the image: google_credentials.py
+      # reads this at import time and it holds the OAuth client secret.
+      - ./credentials.json:/app/credentials.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Placeholder until the real arq jobs land - see backend/app/worker.py.
+  # Defined now so the topology is complete and the container's memory
+  # behaviour is visible during the soak test rather than after it.
+  worker:
+    build: ./backend
+    command: ["arq", "app.worker.WorkerSettings"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # Builds the static bundle into a volume Caddy serves, then exits. Not a
+  # long-running service - `docker compose up` republishes it each time.
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BACKEND_ORIGIN: ${APP_ORIGIN:-https://app.classyncal.com}
+    volumes:
+      - frontend-dist:/dist
+    restart: "no"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_ADDRESS: ${APP_ADDRESS:-:8080}
+      REDIRECT_ADDRESSES: ${REDIRECT_ADDRESSES:-:8081}
+      # ":80" today (plain HTTP on the bare IP, no certificate attempted).
+      # Change to "api.yourdomain.com" once DNS exists and Caddy provisions a
+      # Let's Encrypt certificate on its own, with no other edits needed.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - frontend-dist:/srv:ro
+      - caddy-data:/data      # certificates and ACME account keys - losing this
+      - caddy-config:/config  # means re-issuing certs and risking rate limits
+    depends_on:
+      api:
+        condition: service_started
+      frontend:
+        condition: service_completed_successfully
+
+volumes:
+  frontend-dist:
+  postgres-data:
+  caddy-data:
+  caddy-config:

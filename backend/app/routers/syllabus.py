@@ -13,6 +13,7 @@ from app.services.document_parsing import (
     make_pdf_input_content,
     make_text_input_content,
 )
+from app.services.rate_limit import check_upload_quota
 from app.services.session import get_session
 from app.utils import error_response
 
@@ -38,6 +39,14 @@ async def upload_syllabus(
             "missing_openai_api_key",
             "OPENAI_API_KEY is not configured on the backend.",
         )
+
+    # Checked before the file is read into memory, and well before anything is
+    # enqueued - this endpoint needs no login, so it is the one place a stranger
+    # can spend our OpenAI budget.
+    refusal = check_upload_quota(request, session.session_id)
+    if refusal is not None:
+        code, message = refusal
+        return error_response(429 if code == "rate_limited" else 503, code, message)
 
     contents = await file.read()
 

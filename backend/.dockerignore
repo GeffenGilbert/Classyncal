@@ -1,0 +1,17 @@
+# Keeping these out of the build context matters for more than image size:
+# .env, credentials.json and token.json would otherwise be baked into an image
+# layer, where they survive even if a later layer deletes them.
+.env
+.env.*
+credentials.json
+token.json
+
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+.git/
+.gitignore
+Dockerfile
+.dockerignore
