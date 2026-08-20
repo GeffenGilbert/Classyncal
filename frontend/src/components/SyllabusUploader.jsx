@@ -251,6 +251,12 @@ function SyllabusUploader() {
 
       {uploadError && <p className="text-sm text-red-500">{uploadError}</p>}
 
+      <p className="fixed right-8 top-8 hidden max-w-none whitespace-nowrap text-left text-xs leading-relaxed text-slate-400 lg:block">
+        Classyncal requests access to your Google Calendar and Tasks to add your syllabus items on your behalf.
+        <br />
+        We don't access or store any other data from your account.
+      </p>
+
       {extractedData && (
         <ReviewModal
           data={extractedData}
