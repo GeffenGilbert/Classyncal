@@ -25,7 +25,7 @@
 </div>
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: August 19, 2026</p>
+<p class="updated">Last updated: August 22, 2026</p>
 
 <p>Classyncal ("we", "our", "the app") is a tool that reads uploaded course syllabi and helps you add assignments, exams, and other dates to your Google Calendar and Google Tasks. This policy explains what data we collect, why, and how we handle it.</p>
 
@@ -48,6 +48,16 @@
   <li>To parse your syllabus into a reviewable list of dates and assignments.</li>
   <li>To create the calendar events and tasks you explicitly approve after reviewing the parsed content.</li>
   <li>We do not use your Google data for advertising, profiling, or any purpose unrelated to the syllabus-to-calendar functionality described above.</li>
+</ul>
+
+<h2>How we protect your data</h2>
+<ul>
+  <li><strong>Encryption in transit.</strong> All traffic between your browser, our servers, and Google's APIs is sent over HTTPS/TLS.</li>
+  <li><strong>Encryption at rest.</strong> Your Google OAuth tokens are encrypted (AES-128 via Fernet, an authenticated symmetric encryption scheme) before being written to our database. The encryption key is stored separately from the database and its backups, so a copy of the database alone cannot be used to read a token.</li>
+  <li><strong>Minimal scope.</strong> We request only the two narrow scopes this app needs — creating Calendar events and Tasks — never full account access, email, contacts, or Drive.</li>
+  <li><strong>Restricted infrastructure access.</strong> Our database and job queue are not reachable from the public internet; only our own backend service can query them, over a private network with no externally-facing port.</li>
+  <li><strong>Secure session cookies.</strong> The cookie identifying your browser session is HttpOnly (inaccessible to page scripts) and marked Secure in production, so it is only ever sent over HTTPS.</li>
+  <li><strong>Minimal data model.</strong> We do not store your Google email, name, or profile information — only an internal identifier tied to your encrypted token.</li>
 </ul>
 
 <h2>How we share information</h2>
