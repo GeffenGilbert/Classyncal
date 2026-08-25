@@ -30,12 +30,14 @@ function EventsTab({ events, indices, path, addLabel, blankItem, onUpdate, onRem
                 <EditableField
                   type="time"
                   value={event.start_time}
+                  placeholder="--:--"
                   onChange={(value) => onUpdate(path, index, "start_time", value)}
                 />
                 <span className="text-slate-400">-</span>
                 <EditableField
                   type="time"
                   value={event.end_time}
+                  placeholder="--:--"
                   onChange={(value) => onUpdate(path, index, "end_time", value)}
                 />
               </div>

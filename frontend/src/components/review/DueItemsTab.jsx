@@ -29,6 +29,7 @@ function DueItemsTab({ items, indices, path, onUpdate, onRemove, onAdd, addLabel
               <EditableField
                 type="time"
                 value={item.due_time}
+                placeholder="--:--"
                 onChange={(value) => onUpdate(path, index, "due_time", value)}
               />
               <EditableField
