@@ -1,3 +1,6 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from app.services.titling import titled
 
 
@@ -133,6 +136,9 @@ def create_task(
 # span of everything else that is dated in the same syllabus - exams, due dates,
 # cancellations - which brackets the term closely enough to be useful and is at worst a
 # week or so long at the end. Returns (None, None) only if nothing anywhere has a date.
+# If the term is still ongoing (its latest dated item is still in the future), start
+# from today instead of the earliest dated item, so the recurring event doesn't fill
+# the user's calendar with occurrences for weeks that have already passed.
 def term_bounds(payload):
     dates = []
     for meeting in payload.get("class_schedule", {}).get("meetings", []):
@@ -145,6 +151,10 @@ def term_bounds(payload):
     dates = sorted(d for d in dates if d)
     if not dates:
         return None, None
+
+    today = datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+    if dates[-1] > today:
+        return today, dates[-1]
     return dates[0], dates[-1]
 
 def add_class_schedule(payload, service, color_id):
