@@ -7,7 +7,7 @@ import { getSortedIndices } from "./sortByDate";
 // Assignments, Projects, and Readings. `indices` selects which of `items` this
 // tab shows; `blankItem` carries the type field that keeps a newly added item
 // in the tab that created it.
-function DueItemsTab({ items, indices, path, onUpdate, onRemove, onAdd, addLabel, blankItem }) {
+function DueItemsTab({ items, indices, path, onUpdate, onRemove, onAdd, addLabel, blankItem, showDateErrors }) {
   return (
     <div className="flex flex-col">
       {getSortedIndices(items, "due_date", "due_time", indices).map((index) => {
@@ -24,6 +24,7 @@ function DueItemsTab({ items, indices, path, onUpdate, onRemove, onAdd, addLabel
               <EditableField
                 type="date"
                 value={item.due_date}
+                invalid={showDateErrors && !item.due_date}
                 onChange={(value) => onUpdate(path, index, "due_date", value)}
               />
               <EditableField

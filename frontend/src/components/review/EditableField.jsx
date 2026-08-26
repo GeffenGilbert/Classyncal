@@ -1,15 +1,18 @@
 import { X } from "lucide-react";
 
 const BASE_CLASS =
-  "mr-4 rounded border border-slate-200 bg-transparent px-1.5 py-1 text-sm text-slate-900 transition-colors hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:outline-none";
+  "mr-4 rounded border bg-transparent px-1.5 py-1 text-sm text-slate-900 transition-colors focus:bg-white focus:outline-none";
+const BORDER_CLASS = "border-slate-200 hover:border-slate-300 focus:border-indigo-400";
+const INVALID_BORDER_CLASS = "border-red-400 hover:border-red-400 focus:border-red-500";
 
 // Date/time inputs shrink to fit their content so the browser's picker icon
 // sits right next to the typed value instead of at the far edge of a
 // stretched grid cell.
 const WIDTH_CLASS = { date: "w-fit", time: "w-fit" };
 
-function EditableField({ type = "text", value, onChange, placeholder, options, className = "" }) {
+function EditableField({ type = "text", value, onChange, placeholder, options, className = "", invalid = false }) {
   const widthClass = WIDTH_CLASS[type] ?? "w-[calc(100%-1rem)]";
+  const borderClass = invalid ? INVALID_BORDER_CLASS : BORDER_CLASS;
 
   if (type === "textarea") {
     return (
@@ -18,7 +21,7 @@ function EditableField({ type = "text", value, onChange, placeholder, options, c
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={2}
-        className={`${BASE_CLASS} ${widthClass} resize-none ${className}`}
+        className={`${BASE_CLASS} ${borderClass} ${widthClass} resize-none ${className}`}
       />
     );
   }
@@ -28,7 +31,7 @@ function EditableField({ type = "text", value, onChange, placeholder, options, c
       <select
         value={value ?? ""}
         onChange={(event) => onChange(event.target.value)}
-        className={`${BASE_CLASS} ${widthClass} ${className}`}
+        className={`${BASE_CLASS} ${borderClass} ${widthClass} ${className}`}
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -47,7 +50,7 @@ function EditableField({ type = "text", value, onChange, placeholder, options, c
           value={value ?? ""}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className={`mr-0 ${BASE_CLASS.replace("mr-4 ", "")} ${widthClass} ${value ? "pr-6" : ""} ${className}`}
+          className={`mr-0 ${BASE_CLASS.replace("mr-4 ", "")} ${borderClass} ${widthClass} ${value ? "pr-6" : ""} ${className}`}
         />
         {value && (
           // iOS Safari's native time picker has no way to clear a value once set.
@@ -70,7 +73,7 @@ function EditableField({ type = "text", value, onChange, placeholder, options, c
       value={value ?? ""}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className={`${BASE_CLASS} ${widthClass} ${className}`}
+      className={`${BASE_CLASS} ${borderClass} ${widthClass} ${className}`}
     />
   );
 }
