@@ -104,6 +104,23 @@ const TAB_CONFIG = [
 // Distinct paths, for the _key strip that runs over everything on confirm.
 const ALL_PATHS = [...new Set(TAB_CONFIG.map((tab) => tab.path))];
 
+// Everything except class_schedule needs a date to be synced at all -
+// class_schedule meetings fall back to an inferred term span instead (see
+// term_bounds in google_sync.py).
+const REQUIRED_DATE_FIELD = { events: "date", tasks: "due_date", readings: "due_date" };
+
+// Checked against reviewSteps (the tabs the user opted into) and each tab's
+// own indices/items, so a deselected category or a deleted item - which is
+// simply absent from those - can never trigger this.
+function tabHasMissingDates(tab) {
+  const field = REQUIRED_DATE_FIELD[tab.path];
+  return field ? tab.indices.some((index) => !tab.items[index][field]) : false;
+}
+
+function findFirstInvalidStep(steps) {
+  return steps.findIndex(tabHasMissingDates);
+}
+
 function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitError }) {
   // Indices into each tab's source array, so a tab can render its own subset
   // while still updating and removing items by their real position.
@@ -129,6 +146,10 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
     () => new Set(availableTabs.map((tab) => tab.id)),
   );
   const [colorId, setColorId] = useState(DEFAULT_COLOR_ID);
+  // Only starts showing red outlines/the warning banner after a first
+  // Add to Calendar attempt catches a missing date - not before, so the
+  // review flow isn't flagged as an error before the user has done anything.
+  const [validationAttempted, setValidationAttempted] = useState(false);
 
   // Ordered list of the categories the user opted into, one per review step.
   // Deliberately not filtered by live count: a category the user selected
@@ -136,6 +157,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   // reviewing, otherwise the step index would point past the shrunk list.
   const reviewSteps = tabs.filter((tab) => selectedTabs.has(tab.id));
   const currentTab = typeof step === "number" ? reviewSteps[step] : null;
+  const currentTabHasMissingDates = validationAttempted && currentTab && tabHasMissingDates(currentTab);
 
   function updateItem(path, index, field, value) {
     onChange((prev) => {
@@ -189,6 +211,13 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   }
 
   function handleConfirm() {
+    const invalidStep = findFirstInvalidStep(reviewSteps);
+    if (invalidStep !== -1) {
+      setValidationAttempted(true);
+      setStep(invalidStep);
+      return;
+    }
+
     let payload = data;
 
     // Drop the items belonging to each category the user opted out of. Tabs can
@@ -306,6 +335,11 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
               <p className="text-sm font-medium text-slate-500">
                 Review and Edit the <span className="font-bold">{currentTab.label}</span> to Your Preferences
               </p>
+              {currentTabHasMissingDates && (
+                <p className="mt-2 text-sm font-medium text-red-500">
+                  Any events/tasks without dates will not be added.
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
@@ -327,6 +361,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                   onUpdate={updateItem}
                   onRemove={removeItem}
                   onAdd={addItem}
+                  showDateErrors={validationAttempted}
                 />
               )}
               {["assignments", "projects", "readings"].includes(currentTab.id) && (
@@ -339,6 +374,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                   onUpdate={updateItem}
                   onRemove={removeItem}
                   onAdd={addItem}
+                  showDateErrors={validationAttempted}
                 />
               )}
             </div>

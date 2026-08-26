@@ -7,7 +7,7 @@ import { getSortedIndices } from "./sortByDate";
 // Any tab whose items render as one-off calendar entries: a date, an optional
 // time range, and a location. `indices` selects which of `events` this tab
 // shows; `blankItem` carries the type field for newly added items.
-function EventsTab({ events, indices, path, addLabel, blankItem, onUpdate, onRemove, onAdd }) {
+function EventsTab({ events, indices, path, addLabel, blankItem, onUpdate, onRemove, onAdd, showDateErrors }) {
   return (
     <div className="flex flex-col">
       {getSortedIndices(events, "date", "start_time", indices).map((index) => {
@@ -24,6 +24,7 @@ function EventsTab({ events, indices, path, addLabel, blankItem, onUpdate, onRem
               <EditableField
                 type="date"
                 value={event.date}
+                invalid={showDateErrors && !event.date}
                 onChange={(value) => onUpdate(path, index, "date", value)}
               />
               <div className="col-span-2 flex items-center justify-self-end gap-1.5 sm:col-start-3">
