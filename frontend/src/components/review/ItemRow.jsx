@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 
-function ItemRow({ onRemove, children }) {
+function ItemRow({ id, onRemove, children }) {
   const [isRemoving, setIsRemoving] = useState(false);
 
   return (
     <div
+      id={id}
       className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
         isRemoving ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
       }`}

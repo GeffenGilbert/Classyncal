@@ -353,6 +353,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
               )}
               {["tests", "events"].includes(currentTab.id) && (
                 <EventsTab
+                  key={currentTab.id}
                   events={currentTab.items}
                   indices={currentTab.indices}
                   path={currentTab.path}
@@ -362,10 +363,12 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                   onRemove={removeItem}
                   onAdd={addItem}
                   showDateErrors={validationAttempted}
+                  scrollToFirstMissingDate={validationAttempted}
                 />
               )}
               {["assignments", "projects", "readings"].includes(currentTab.id) && (
                 <DueItemsTab
+                  key={currentTab.id}
                   items={currentTab.items}
                   indices={currentTab.indices}
                   path={currentTab.path}
@@ -375,6 +378,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                   onRemove={removeItem}
                   onAdd={addItem}
                   showDateErrors={validationAttempted}
+                  scrollToFirstMissingDate={validationAttempted}
                 />
               )}
             </div>
