@@ -32,7 +32,7 @@ function EventsTab({ events, indices, path, addLabel, blankItem, onUpdate, onRem
                   value={event.start_time}
                   onChange={(value) => onUpdate(path, index, "start_time", value)}
                 />
-                <span className="text-slate-400">-</span>
+                <span className="text-slate-400 dark:text-slate-500">-</span>
                 <EditableField
                   type="time"
                   value={event.end_time}
@@ -40,7 +40,7 @@ function EventsTab({ events, indices, path, addLabel, blankItem, onUpdate, onRem
                 />
               </div>
               <div className="col-span-2 flex items-center gap-1.5 sm:col-span-4">
-                <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
+                <MapPin className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
                 <EditableField
                   value={event.location}
                   placeholder="Location"

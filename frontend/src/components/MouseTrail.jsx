@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import { useTheme } from "../theme";
+
 // Minimum mouse-move distance (px) before a new cluster spawns.
 const SPAWN_DISTANCE = 24;
 // Number of squares spawned per cluster.
@@ -14,8 +16,13 @@ const LIFETIME_MS = 900;
 const SQUARE_OPACITY = 0.2;
 // Gray tones (Tailwind slate RGB values) squares are randomly assigned for
 // visual variation. Kept as raw RGB, not Tailwind classes, so SQUARE_OPACITY
-// can be applied dynamically via inline style.
-const GRAY_SHADES_RGB = ["203, 213, 225", "148, 163, 184", "100, 116, 139"];
+// can be applied dynamically via inline style. The squares are translucent
+// fills, so the set has to invert with the theme - slate 300-500 reads against
+// a light page and disappears against a near-black one.
+const GRAY_SHADES_RGB = {
+  light: ["203, 213, 225", "148, 163, 184", "100, 116, 139"],
+  dark: ["148, 163, 184", "203, 213, 225", "226, 232, 240"],
+};
 // Smallest a square can be (px).
 const MIN_SQUARE_SIZE = 2;
 // Largest a square can be (px), on top of MIN_SQUARE_SIZE.
@@ -29,8 +36,11 @@ let nextSquareId = 0;
 function MouseTrail() {
   const [squares, setSquares] = useState([]);
   const lastPos = useRef(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
+    const shades = GRAY_SHADES_RGB[theme];
+
     function handleMouseMove(event) {
       const { clientX: x, clientY: y } = event;
       const last = lastPos.current;
@@ -51,7 +61,7 @@ function MouseTrail() {
           x: x + Math.cos(angle) * radius,
           y: y + Math.sin(angle) * radius,
           size: MIN_SQUARE_SIZE + Math.random() * MAX_SQUARE_SIZE_ADD,
-          shadeRgb: GRAY_SHADES_RGB[Math.floor(Math.random() * GRAY_SHADES_RGB.length)],
+          shadeRgb: shades[Math.floor(Math.random() * shades.length)],
           driftX: Math.cos(driftAngle) * DRIFT_DISTANCE,
           driftY: Math.sin(driftAngle) * DRIFT_DISTANCE,
         };
@@ -67,7 +77,7 @@ function MouseTrail() {
 
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
+  }, [theme]);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 overflow-hidden">
