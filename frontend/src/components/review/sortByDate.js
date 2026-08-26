@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 // Returns item indices sorted chronologically by date (then time as a
 // tiebreaker), so callers can render in sorted order while still using the
 // original index for onUpdate/onRemove — the underlying array itself is
@@ -25,4 +27,24 @@ export function getSortedIndices(items, dateField, timeField, indices) {
       if (!timeB) return 1;
       return timeA < timeB ? -1 : 1;
     });
+}
+
+// Sorts once, the moment a tab is first shown, then holds that order fixed -
+// otherwise clearing an item's date (e.g. to fix a validation error) would
+// instantly resort it to the bottom of the list, out from under the user
+// mid-edit. Removed items drop out on their own since they're no longer in
+// `indices`; items added afterward have no date to place them by, so they're
+// appended in the order they were added.
+export function useFrozenSortedIndices(items, dateField, timeField, indices) {
+  const [orderedKeys] = useState(() =>
+    getSortedIndices(items, dateField, timeField, indices).map((index) => items[index]._key),
+  );
+
+  const currentIndexByKey = new Map(indices.map((index) => [items[index]._key, index]));
+  const knownKeys = new Set(orderedKeys);
+
+  return [
+    ...orderedKeys.filter((key) => currentIndexByKey.has(key)).map((key) => currentIndexByKey.get(key)),
+    ...indices.filter((index) => !knownKeys.has(items[index]._key)),
+  ];
 }

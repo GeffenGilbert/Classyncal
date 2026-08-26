@@ -1,19 +1,46 @@
+import { useEffect } from "react";
 import { MapPin } from "lucide-react";
 import EditableField from "./EditableField";
 import ItemRow from "./ItemRow";
 import AddItemButton from "./AddItemButton";
-import { getSortedIndices } from "./sortByDate";
+import { useFrozenSortedIndices } from "./sortByDate";
 
 // Any tab whose items render as one-off calendar entries: a date, an optional
 // time range, and a location. `indices` selects which of `events` this tab
 // shows; `blankItem` carries the type field for newly added items.
-function EventsTab({ events, indices, path, addLabel, blankItem, onUpdate, onRemove, onAdd, showDateErrors }) {
+function EventsTab({
+  events,
+  indices,
+  path,
+  addLabel,
+  blankItem,
+  onUpdate,
+  onRemove,
+  onAdd,
+  showDateErrors,
+  scrollToFirstMissingDate,
+}) {
+  const sortedIndices = useFrozenSortedIndices(events, "date", "start_time", indices);
+
+  // Runs once when this tab mounts (it remounts on every tab switch - see the
+  // `key` in ReviewModal) so a failed Add to Calendar attempt doesn't just
+  // land the user on the right tab, it lands them on the exact row to fix.
+  useEffect(() => {
+    if (!scrollToFirstMissingDate) return;
+    const missingIndex = sortedIndices.find((index) => !events[index].date);
+    if (missingIndex === undefined) return;
+    document
+      .getElementById(`item-${events[missingIndex]._key}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="flex flex-col">
-      {getSortedIndices(events, "date", "start_time", indices).map((index) => {
+      {sortedIndices.map((index) => {
         const event = events[index];
         return (
-          <ItemRow key={event._key} onRemove={() => onRemove(path, index)}>
+          <ItemRow key={event._key} id={`item-${event._key}`} onRemove={() => onRemove(path, index)}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <EditableField
                 className="col-span-2 sm:col-span-4 font-medium"
