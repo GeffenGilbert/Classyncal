@@ -41,7 +41,7 @@ function ClassScheduleTab({ meetings, onUpdate, onRemove, onAdd }) {
                 value={meeting.start_time}
                 onChange={(value) => onUpdate("class_schedule.meetings", index, "start_time", value)}
               />
-              <span className="text-slate-400">-</span>
+              <span className="text-slate-400 dark:text-slate-500">-</span>
               <EditableField
                 type="time"
                 value={meeting.end_time}
@@ -49,7 +49,7 @@ function ClassScheduleTab({ meetings, onUpdate, onRemove, onAdd }) {
               />
             </div>
             <div className="col-span-2 flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
+              <MapPin className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
               <EditableField
                 value={meeting.location}
                 placeholder="Location"

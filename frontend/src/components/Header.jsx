@@ -9,11 +9,11 @@ function Header() {
           height="36"
           className="h-9 w-9 rounded-lg"
         />
-        <span className="text-lg font-medium tracking-tight text-slate-900">
+        <span className="text-lg font-medium tracking-tight text-slate-900 dark:text-slate-50">
           Classyncal
         </span>
       </div>
-      <p className="text-sm italic text-slate-500">
+      <p className="text-sm italic text-slate-500 dark:text-slate-400">
         Turns your syllabus into Google Calendar events and Tasks automatically.
       </p>
     </header>
