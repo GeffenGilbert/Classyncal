@@ -39,12 +39,14 @@ function ClassScheduleTab({ meetings, onUpdate, onRemove, onAdd }) {
               <EditableField
                 type="time"
                 value={meeting.start_time}
+                placeholder="--:--"
                 onChange={(value) => onUpdate("class_schedule.meetings", index, "start_time", value)}
               />
               <span className="text-slate-400 dark:text-slate-500">-</span>
               <EditableField
                 type="time"
                 value={meeting.end_time}
+                placeholder="--:--"
                 onChange={(value) => onUpdate("class_schedule.meetings", index, "end_time", value)}
               />
             </div>
