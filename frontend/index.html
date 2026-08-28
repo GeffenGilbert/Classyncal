@@ -9,14 +9,14 @@
     <title>Classyncal</title>
     <meta name="description" content="Turn a syllabus PDF into Google Calendar events and Google Tasks in a few clicks." />
     <script>
-      // Runs before first paint so a dark-mode visitor never sees a white flash.
+      // Runs before first paint so a returning dark-mode visitor never sees a
+      // white flash.
       // Mirrored in /privacy and /terms, which are plain HTML outside the app.
       (function () {
         try {
-          var stored = localStorage.getItem("classyncal-theme");
-          var dark = stored
-            ? stored === "dark"
-            : window.matchMedia("(prefers-color-scheme: dark)").matches;
+          // Light is the default: dark is opt-in through the toggle, never inferred
+          // from the OS. Only an explicit stored choice turns it on.
+          var dark = localStorage.getItem("classyncal-theme") === "dark";
           document.documentElement.classList.toggle("dark", dark);
           document.documentElement.style.colorScheme = dark ? "dark" : "light";
         } catch (e) {

@@ -31,10 +31,9 @@
 <script>
   (function () {
     try {
-      var stored = localStorage.getItem("classyncal-theme");
-      var dark = stored
-        ? stored === "dark"
-        : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      // Light is the default: dark is opt-in through the toggle, never inferred
+      // from the OS. Only an explicit stored choice turns it on.
+      var dark = localStorage.getItem("classyncal-theme") === "dark";
       if (dark) document.documentElement.classList.add("dark");
       document.documentElement.style.colorScheme = dark ? "dark" : "light";
     } catch (e) {
