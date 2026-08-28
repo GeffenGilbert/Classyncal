@@ -2,8 +2,11 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
-/* Tailwind v4 keys `dark:` off prefers-color-scheme by default. The toggle needs
-   it keyed off a class instead, so an explicit choice can override the OS. */
+/* Tailwind v4 keys `dark:` off prefers-color-scheme by default. This app never
+   consults the OS - light is the default and dark is opt-in through the toggle -
+   so the variant is rekeyed to the `dark` class the toggle sets. Note :where()
+   contributes no specificity, so a `dark:` rule ties with a plain utility and wins
+   only on source order; a longhand like border-t-* needs its own dark: restatement. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
