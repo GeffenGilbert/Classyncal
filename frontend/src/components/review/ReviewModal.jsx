@@ -249,13 +249,13 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 dark:bg-slate-950/70 p-4">
       <div
-        className={`flex w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl ${
+        className={`flex w-full max-w-3xl flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-xl ${
           currentTab ? "h-[85vh]" : "max-h-[85vh]"
         }`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-6">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 p-6">
           <div className="flex flex-1 flex-col gap-2">
             <EditableField
               className="text-lg font-semibold"
@@ -285,7 +285,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-slate-400 transition-colors hover:text-slate-600"
+            className="text-slate-400 dark:text-slate-500 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
           >
             <X className="h-5 w-5" />
           </button>
@@ -293,7 +293,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
 
         {step === "select" && (
           <div className="flex-1 overflow-y-auto p-6">
-            <p className="mb-4 text-sm text-slate-500">
+            <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
               Choose which categories you&apos;d like to add to your calendar.
             </p>
             <div className="flex flex-col gap-2">
@@ -306,18 +306,18 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                     onClick={() => toggleTabSelected(tab.id)}
                     className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors ${
                       isSelected
-                        ? "border-indigo-500 bg-indigo-50"
-                        : "border-slate-200 hover:border-slate-300"
+                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10"
+                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                     }`}
                   >
-                    <span className="text-sm font-medium text-slate-700">
-                      {tab.label} <span className="text-slate-400">({tab.count})</span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {tab.label} <span className="text-slate-400 dark:text-slate-500">({tab.count})</span>
                     </span>
                     <span
                       className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
                         isSelected
                           ? "border-indigo-500 bg-indigo-500"
-                          : "border-slate-300 bg-white"
+                          : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                       }`}
                     >
                       {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
@@ -331,8 +331,8 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
 
         {currentTab && (
           <>
-            <div className="mt-4 border-b border-slate-200 px-6 pb-3">
-              <p className="text-sm font-medium text-slate-500">
+            <div className="mt-4 border-b border-slate-200 dark:border-slate-800 px-6 pb-3">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Review and Edit the <span className="font-bold">{currentTab.label}</span> to Your Preferences
               </p>
               {currentTabHasMissingDates && (
@@ -387,23 +387,23 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
 
         {step === "colors" && (
           <div className="flex-1 overflow-y-auto p-6">
-            <p className="mb-4 text-sm text-slate-500">
+            <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
               Pick a <span className="font-bold">calendar color</span> for the events.
             </p>
             <ColorPicker value={colorId} onChange={setColorId} />
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-slate-200 p-6">
+        <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 p-6">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             Cancel
           </button>
           <div className="flex items-center gap-3">
-            {submitError && <p className="text-sm text-red-500">{submitError}</p>}
+            {submitError && <p className="text-sm text-red-500 dark:text-red-400">{submitError}</p>}
             {step === "select" && (
               <button
                 type="button"
@@ -419,7 +419,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                 <button
                   type="button"
                   onClick={handleBackFromReview}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   Back
                 </button>
@@ -437,7 +437,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                 <button
                   type="button"
                   onClick={handleBackFromColors}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   Back
                 </button>

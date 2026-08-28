@@ -1,9 +1,11 @@
 import { X } from "lucide-react";
 
 const BASE_CLASS =
-  "mr-4 rounded border bg-transparent px-1.5 py-1 text-sm text-slate-900 transition-colors focus:bg-white focus:outline-none";
-const BORDER_CLASS = "border-slate-200 hover:border-slate-300 focus:border-indigo-400";
-const INVALID_BORDER_CLASS = "border-red-400 hover:border-red-400 focus:border-red-500";
+  "mr-4 rounded border bg-transparent px-1.5 py-1 text-sm text-slate-900 dark:text-slate-50 transition-colors focus:bg-white dark:focus:bg-slate-800 focus:outline-none";
+const BORDER_CLASS =
+  "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600 focus:border-indigo-400";
+const INVALID_BORDER_CLASS =
+  "border-red-400 dark:border-red-500 hover:border-red-400 dark:hover:border-red-500 focus:border-red-500 dark:focus:border-red-400";
 
 // Date/time inputs shrink to fit their content so the browser's picker icon
 // sits right next to the typed value instead of at the far edge of a
@@ -58,7 +60,7 @@ function EditableField({ type = "text", value, onChange, placeholder, options, c
             type="button"
             onClick={() => onChange("")}
             aria-label="Clear time"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
           >
             <X className="h-3.5 w-3.5" />
           </button>

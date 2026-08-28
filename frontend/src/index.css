@@ -2,17 +2,23 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
+/* Tailwind v4 keys `dark:` off prefers-color-scheme by default. The toggle needs
+   it keyed off a class instead, so an explicit choice can override the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
 }
 
+/* src/theme.js sets color-scheme inline on <html>, as does the pre-paint script
+   in index.html; this is only the fallback for a load where neither ran. */
 :root {
   color-scheme: light;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 font-sans antialiased;
+  @apply bg-slate-50 text-slate-900 font-sans antialiased dark:bg-slate-950 dark:text-slate-100;
 }
 
 /* Chrome pads its date/time picker icons well away from the value by

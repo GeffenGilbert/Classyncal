@@ -177,14 +177,14 @@ function SyllabusUploader() {
   return (
     <>
       {justAddedToCalendar && (
-        <p className="relative -top-22 text-sm font-medium text-emerald-600">
+        <p className="relative -top-22 text-sm font-medium text-emerald-600 dark:text-emerald-400">
           Syllabus Added to Calendar!
         </p>
       )}
 
       <div className="flex flex-col items-center gap-1 text-center">
-        {justAddedToCalendar && <p className="text-sm text-slate-500">Feel Free to</p>}
-        <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+        {justAddedToCalendar && <p className="text-sm text-slate-500 dark:text-slate-400">Feel Free to</p>}
+        <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">
           {justAddedToCalendar ? "Upload Another Syllabus" : "Upload Your Syllabus"}
         </h1>
       </div>
@@ -201,8 +201,8 @@ function SyllabusUploader() {
           onDrop={handleDrop}
           className={`relative z-20 flex w-full max-w-xl cursor-pointer flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-10 py-16 text-center transition-colors ${
             isDragging
-              ? "border-indigo-500 bg-indigo-50"
-              : "border-slate-300 bg-slate-50 hover:border-slate-400"
+              ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10"
+              : "border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 hover:border-slate-400 dark:hover:border-slate-600"
           }`}
         >
           <input
@@ -217,20 +217,20 @@ function SyllabusUploader() {
             <>
               <FileText className="h-10 w-10 text-indigo-500" />
               <div>
-                <p className="font-medium text-slate-900">{selectedFile.name}</p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="font-medium text-slate-900 dark:text-slate-50">{selectedFile.name}</p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Click or drop a file to replace it
                 </p>
               </div>
             </>
           ) : (
             <>
-              <UploadCloud className="h-10 w-10 text-slate-400" />
+              <UploadCloud className="h-10 w-10 text-slate-400 dark:text-slate-500" />
               <div>
-                <p className="font-medium text-slate-900">
+                <p className="font-medium text-slate-900 dark:text-slate-50">
                   Drag & drop your syllabus here
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   or click to browse
                 </p>
               </div>
@@ -249,11 +249,14 @@ function SyllabusUploader() {
         </button>
       )}
 
-      {uploadError && <p className="text-sm text-red-500">{uploadError}</p>}
+      {uploadError && <p className="text-sm text-red-500 dark:text-red-400">{uploadError}</p>}
 
-      <p className="fixed right-8 top-8 hidden max-w-none whitespace-nowrap text-left text-xs leading-relaxed text-slate-400 lg:block">
+      {/* Bounded and allowed to wrap. As a single nowrap line this reached far
+          enough left to collide with the header tagline between about 1024 and
+          1100px; a max width keeps it clear at every size without hiding text
+          that is there for Google's OAuth review. */}
+      <p className="fixed right-8 top-8 hidden max-w-sm text-left text-xs leading-relaxed text-slate-400 dark:text-slate-500 lg:block">
         Classyncal requests access to your Google Calendar and Tasks to add your syllabus items on your behalf.
-        <br />
         We don't access or store any other data from your account.
       </p>
 
