@@ -46,20 +46,20 @@ function UploadingScreen({ fileName }) {
   }, []);
 
   return (
-    <div className="flex w-full max-w-xl flex-col items-center gap-4 rounded-2xl border-2 border-slate-200 bg-slate-50 px-10 py-16 text-center">
+    <div className="flex w-full max-w-xl flex-col items-center gap-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-10 py-16 text-center">
       <div className="relative flex h-16 w-16 items-center justify-center">
-        <div className="absolute inset-0 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-500" />
+        <div className="absolute inset-0 animate-spin rounded-full border-2 border-slate-200 dark:border-slate-800 border-t-indigo-500" />
         <FileSearch className="h-7 w-7 text-indigo-500" />
       </div>
 
       <div>
-        <p className="font-medium text-slate-900">
+        <p className="font-medium text-slate-900 dark:text-slate-50">
           {fileName ? `Processing ${fileName}` : "Processing your syllabus"}
         </p>
-        <p className="mt-1 text-sm text-slate-500">{PROCESSING_MESSAGES[messageIndex]}</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{PROCESSING_MESSAGES[messageIndex]}</p>
       </div>
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-400 dark:text-slate-500">
         {formatElapsed(elapsedSeconds)} elapsed &middot; longer syllabi can take a minute or more
       </p>
     </div>

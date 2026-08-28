@@ -5,7 +5,7 @@ function AddItemButton({ onClick, label }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 py-3 text-sm text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-500"
+      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 py-3 text-sm text-slate-500 dark:text-slate-400 transition-colors hover:border-indigo-400 hover:text-indigo-500"
     >
       <Plus className="h-4 w-4" />
       {label}
