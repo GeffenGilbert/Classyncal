@@ -43,7 +43,7 @@ async def upload_syllabus(
     # Checked before the file is read into memory, and well before anything is
     # enqueued - this endpoint needs no login, so it is the one place a stranger
     # can spend our OpenAI budget.
-    refusal = check_upload_quota(request, session.session_id)
+    refusal = check_upload_quota(session.session_id)
     if refusal is not None:
         code, message = refusal
         return error_response(429 if code == "rate_limited" else 503, code, message)
