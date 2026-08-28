@@ -63,7 +63,7 @@ function UploadingScreen({ fileName }) {
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{PROCESSING_MESSAGES[messageIndex]}</p>
       </div>
 
-      <p className="text-xs text-slate-400 dark:text-slate-500">
+      <p className="text-xs text-slate-400 dark:text-slate-400">
         {formatElapsed(elapsedSeconds)} elapsed &middot; longer syllabi can take a minute or more
       </p>
     </div>
