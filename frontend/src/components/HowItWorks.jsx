@@ -14,15 +14,15 @@ function HowItWorks() {
     // box at a constant gutter instead of overlapping it. Under ~1060px there is
     // no room beside the box at all and it is hidden rather than shrunk.
     <aside className="fixed left-[min(7rem,calc(50%_-_508px))] top-[50%] hidden w-[180px] -translate-y-1/2 flex-col gap-6 min-[1060px]:flex">
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <p className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-400">
         How it works
       </p>
       {STEPS.map((step, index) => (
         <div key={step} className="flex items-start gap-3">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-300 dark:border-slate-700 text-xs text-slate-400 dark:text-slate-500">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-300 dark:border-slate-700 text-xs text-slate-400 dark:text-slate-400">
             {index + 1}
           </span>
-          <p className="text-sm text-slate-400 dark:text-slate-500">{step}</p>
+          <p className="text-sm text-slate-400 dark:text-slate-400">{step}</p>
         </div>
       ))}
     </aside>
