@@ -19,7 +19,7 @@ function DaysOfWeekPicker({ value = [], onChange }) {
             className={`flex h-6 w-6 items-center justify-center rounded-full text-xs transition-colors ${
               active
                 ? "bg-indigo-500 text-white"
-                : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
             }`}
           >
             {DAY_LABELS[day]}

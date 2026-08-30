@@ -11,14 +11,17 @@
     --page-fg: #1a1a1a;
     --muted-fg: #666;
     --rule: #e5e5e5;
+    --link: #4f46e5;
   }
   html.dark {
     --page-bg: #020617;
     --page-fg: #e2e8f0;
     --muted-fg: #94a3b8;
     --rule: #1e293b;
+    --link: #818cf8;
   }
   html { background: var(--page-bg); }
+  a { color: var(--link); }
   body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: var(--page-fg); background: var(--page-bg); }
   h1 { font-size: 1.8rem; }
   h2 { font-size: 1.3rem; margin-top: 2rem; }
@@ -32,10 +35,9 @@
 <script>
   (function () {
     try {
-      var stored = localStorage.getItem("classyncal-theme");
-      var dark = stored
-        ? stored === "dark"
-        : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      // Light is the default: dark is opt-in through the toggle, never inferred
+      // from the OS. Only an explicit stored choice turns it on.
+      var dark = localStorage.getItem("classyncal-theme") === "dark";
       if (dark) document.documentElement.classList.add("dark");
       document.documentElement.style.colorScheme = dark ? "dark" : "light";
     } catch (e) {

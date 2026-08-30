@@ -285,7 +285,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-slate-400 dark:text-slate-500 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+            className="text-slate-400 dark:text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
           >
             <X className="h-5 w-5" />
           </button>
@@ -311,7 +311,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
                     }`}
                   >
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {tab.label} <span className="text-slate-400 dark:text-slate-500">({tab.count})</span>
+                      {tab.label} <span className="text-slate-400 dark:text-slate-400">({tab.count})</span>
                     </span>
                     <span
                       className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
