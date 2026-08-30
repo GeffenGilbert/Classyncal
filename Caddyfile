@@ -38,7 +38,7 @@
 	encode gzip
 	log {
 		output stdout
-		format console
+		format json
 	}
 }
 
@@ -58,6 +58,6 @@
 	encode gzip
 	log {
 		output stdout
-		format console
+		format json
 	}
 }
