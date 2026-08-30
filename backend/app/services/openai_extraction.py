@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from openai import AsyncOpenAI
 
 from app.config import OPENAI_API_KEY, OPENAI_MODEL, OPENAI_REASONING_EFFORT
@@ -29,6 +31,9 @@ a break is never an event.
 
 Rules:
 - Do not invent dates, times, titles, or locations.
+- A date written without a year is still a date. Take the year from the term, or from
+  today's date given with the document, and let a schedule running past December
+  continue into the next year. Mark a year worked out this way as medium confidence.
 - If information is missing or unclear, use null and explain it in missing_information or warnings.
 - Record every class meeting you can identify, even when details are missing or look
   wrong. Set the unknown fields to null and say what was missing in missing_information.
@@ -70,14 +75,24 @@ async def extract_syllabus(input_content):
     SyllabusExtraction, or None if the model returned an unusable response."""
     client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
+    # The model has no clock, so a syllabus that writes "Sept 23" with no year reads as
+    # a date it cannot complete, and the no-inventing rule then turns it into null. Sent
+    # ahead of the document, and computed per call rather than at import, since the
+    # worker process stays up for days.
+    today = datetime.now(timezone.utc).date().isoformat()
+
     request = {
         "model": OPENAI_MODEL,
         "instructions": INSTRUCTIONS,
         "input": [
             {
                 "role": "user",
+                "content": f"Today's date is {today}.",
+            },
+            {
+                "role": "user",
                 "content": input_content,
-            }
+            },
         ],
         "text_format": SyllabusExtraction,
         "prompt_cache_key": "syllabus-extraction-v1",
