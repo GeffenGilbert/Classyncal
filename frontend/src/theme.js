@@ -8,6 +8,9 @@ const root = () => document.documentElement;
 // index.html sets it before first paint, so there is nothing to hand down through
 // a provider - every caller of useTheme() reads the same value straight from the
 // DOM, which is also what the static /privacy and /terms pages read.
+//
+// Light is the default and dark is opt-in: the OS preference is deliberately not
+// consulted, so a visitor on a dark-themed machine still lands on the light site.
 function subscribe(onStoreChange) {
   const observer = new MutationObserver(onStoreChange);
   observer.observe(root(), { attributes: true, attributeFilter: ["class"] });
@@ -24,31 +27,6 @@ export function setTheme(theme) {
   // rather than any class. Without this the review modal's many date/time
   // inputs keep rendering light-on-light while everything around them is dark.
   root().style.colorScheme = theme;
-}
-
-// Follows the OS only until the user states a preference - once they use the
-// toggle their stored choice wins and system changes stop being applied.
-// Called once from main.jsx rather than on import, to keep this module free of
-// side effects that fire just from being imported.
-export function watchSystemTheme() {
-  const media = window.matchMedia("(prefers-color-scheme: dark)");
-
-  function handleChange(event) {
-    if (readStoredTheme()) return;
-    setTheme(event.matches ? "dark" : "light");
-  }
-
-  media.addEventListener("change", handleChange);
-  return () => media.removeEventListener("change", handleChange);
-}
-
-function readStoredTheme() {
-  try {
-    return localStorage.getItem(THEME_STORAGE_KEY);
-  } catch {
-    // Safari in private mode throws on storage access.
-    return null;
-  }
 }
 
 export function useTheme() {

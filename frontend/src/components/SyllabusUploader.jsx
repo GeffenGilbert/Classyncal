@@ -225,7 +225,7 @@ function SyllabusUploader() {
             </>
           ) : (
             <>
-              <UploadCloud className="h-10 w-10 text-slate-400 dark:text-slate-500" />
+              <UploadCloud className="h-10 w-10 text-slate-400 dark:text-slate-400" />
               <div>
                 <p className="font-medium text-slate-900 dark:text-slate-50">
                   Drag & drop your syllabus here
@@ -255,7 +255,7 @@ function SyllabusUploader() {
           enough left to collide with the header tagline between about 1024 and
           1100px; a max width keeps it clear at every size without hiding text
           that is there for Google's OAuth review. */}
-      <p className="fixed right-8 top-8 hidden max-w-sm text-left text-xs leading-relaxed text-slate-400 dark:text-slate-500 lg:block">
+      <p className="fixed right-8 top-8 hidden max-w-sm text-left text-xs leading-relaxed text-slate-400 dark:text-slate-400 lg:block">
         Classyncal requests access to your Google Calendar and Tasks to add your syllabus items on your behalf.
         We don't access or store any other data from your account.
       </p>
