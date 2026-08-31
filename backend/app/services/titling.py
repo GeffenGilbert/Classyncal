@@ -1,15 +1,49 @@
+import re
+
 # Every item reaching Calendar or Tasks is prefixed with the course code so it is
-# identifiable out of context. Done here rather than in the prompt so it is applied
+# identifiable out of context - a reading titled "1.3-1.5" means nothing in a
+# calendar on its own. Done here rather than in the prompt so it is applied
 # uniformly and cannot drift with the model's phrasing.
+
+# Course codes arrive in whatever shape the syllabus wrote them - "CSC214",
+# "csc 214", "CSC-214" - and the same document can report one shape in
+# course_code while writing another inside a title. Canonicalise to
+# "<DEPT> <NUMBER>" so the prefix reads the same on every item.
+_CODE_SHAPE = re.compile(r"^([A-Za-z]{2,})[\s\-_]*(\d[\w\-]*)$")
+
+def normalize_code(course_code):
+    code = " ".join((course_code or "").split())
+    match = _CODE_SHAPE.match(code)
+    if match:
+        return f"{match.group(1).upper()} {match.group(2).upper()}"
+    return code
+
+# Comparison key: letters and digits only, so "CSC 214", "CSC214" and "csc-214"
+# all collapse to the same thing. The old guard compared with startswith() on the
+# raw strings, so a model-supplied "CSC 214: ..." against a course_code of
+# "CSC214" did not match and the code was prefixed a second time.
+def _key(text):
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+def _strip_code_prefix(name, code):
+    head, separator, tail = name.partition(":")
+    if separator and _key(head) == _key(code) and tail.strip():
+        return tail.strip()
+    return name
+
 def titled(payload, name, fallback):
     name = (name or "").strip() or fallback
-    course_code = (payload.get("course") or {}).get("course_code")
-    if not course_code:
+    code = normalize_code((payload.get("course") or {}).get("course_code"))
+    if not code:
         return name
-    course_code = course_code.strip()
-    if not course_code or name.startswith(course_code):
+
+    # Drop a code the model already wrote into the title, whatever shape it used,
+    # then apply the canonical one - so the prefix is present exactly once and
+    # spelled the same way everywhere.
+    name = _strip_code_prefix(name, code) or fallback
+    if _key(name).startswith(_key(code)):
         return name
-    return f"{course_code}: {name}"
+    return f"{code}: {name}"
 
 # Applied to the extraction before it reaches the review screen, so the titles the
 # user edits are the titles that get created. titled() still runs at sync time and is
