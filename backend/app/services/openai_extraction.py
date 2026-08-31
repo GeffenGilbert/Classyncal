@@ -57,7 +57,10 @@ Rules:
   students - a break, a holiday, an add/drop or withdrawal deadline, a pass/fail or
   grading-option deadline, a registration window, reading days, commencement - goes in no
   list at all, except that a break stopping this class from meeting is a cancellation.
-- Do not include an item that has no date, unless it is a repeating class meeting.
+- Do not include an item that has no date, unless it is a repeating class meeting, or a
+  single occurrence the syllabus names and schedules but leaves undated - a final exam
+  listed as TBD is still an exam, and belongs in events with a null date. This never
+  licenses an item standing in for several occurrences.
 - Record one item per dated occurrence, and never one item standing in for several. A
   syllabus saying homework is assigned weekly without listing the weeks yields no tasks
   at all - not one called "Homework Assignments" - and the same goes for "Weekly Quizzes"
