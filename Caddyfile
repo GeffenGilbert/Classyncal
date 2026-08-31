@@ -38,7 +38,19 @@
 	encode gzip
 	log {
 		output stdout
-		format json
+		# The OAuth callback carries ?code= (a Google authorization code) and
+		# ?state= (the CSRF token) in its query string, so a plain access log
+		# writes both to disk and they persist in the traffic archive. Strip
+		# them at the encoder rather than after the fact.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete code
+					delete state
+				}
+			}
+		}
 	}
 }
 
@@ -58,6 +70,18 @@
 	encode gzip
 	log {
 		output stdout
-		format json
+		# The OAuth callback carries ?code= (a Google authorization code) and
+		# ?state= (the CSRF token) in its query string, so a plain access log
+		# writes both to disk and they persist in the traffic archive. Strip
+		# them at the encoder rather than after the fact.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete code
+					delete state
+				}
+			}
+		}
 	}
 }
