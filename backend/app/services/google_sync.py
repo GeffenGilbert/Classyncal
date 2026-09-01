@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
 from app.services.titling import titled
@@ -131,6 +131,38 @@ def create_task(
 
     service.tasks().insert(tasklist=tasklist, body=body).execute()
 
+# Monday=0, matching date.weekday(). Abbreviations included because the schema asks
+# for full day names but nothing enforces it on a hand-edited payload.
+WEEKDAY_INDEX = {
+    "Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3,
+    "Friday": 4, "Saturday": 5, "Sunday": 6,
+    "Mon": 0, "Tue": 1, "Tues": 1, "Wed": 2, "Thu": 3, "Thur": 3, "Thurs": 3,
+    "Fri": 4, "Sat": 5, "Sun": 6,
+    "M": 0, "T": 1, "W": 2, "R": 3, "F": 4,
+}
+
+# In RFC 5545 - which Google Calendar implements - DTSTART is always an occurrence of
+# the series, whether or not it matches BYDAY. So a Tue/Thu class whose start date
+# lands on a Monday gets that Monday too, on top of the Tue/Thu pattern. That happens
+# whenever the syllabus gave no start date and term_bounds fell back to today, which
+# is why the stray meeting always appeared on the day of upload.
+#
+# Move the start forward to the first day that actually matches, so DTSTART is a real
+# occurrence and adds nothing extra.
+def first_matching_day(start_date, days_of_week):
+    try:
+        current = date.fromisoformat(start_date)
+    except (TypeError, ValueError):
+        return start_date
+    wanted = {WEEKDAY_INDEX[day] for day in days_of_week if day in WEEKDAY_INDEX}
+    if not wanted:
+        return start_date
+    for offset in range(7):
+        candidate = current + timedelta(days=offset)
+        if candidate.weekday() in wanted:
+            return candidate.isoformat()
+    return start_date
+
 # A recurring meeting needs a start and end date to be scheduled at all, and the model
 # supplies them unreliably. Rather than silently skipping the meeting, fall back to the
 # span of everything else that is dated in the same syllabus - exams, due dates,
@@ -186,8 +218,15 @@ def add_class_schedule(payload, service, color_id):
             report["skipped"].append(title)
             continue
 
-        start = f"{start_date}T{start_time}:00"
-        end = f"{start_date}T{end_time}:00"
+        first_day = first_matching_day(start_date, days_of_week)
+        if first_day > end_date:
+            # The whole pattern falls past the end of the term - creating it would
+            # put a single occurrence outside the term rather than a series in it.
+            report["skipped"].append(title)
+            continue
+
+        start = f"{first_day}T{start_time}:00"
+        end = f"{first_day}T{end_time}:00"
 
         create_repeating_event(
             service,
