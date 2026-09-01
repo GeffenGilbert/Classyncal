@@ -1,46 +1,12 @@
 # Syllabus Calendar Project
 
-A web app that turns a syllabus PDF into Google Calendar events and Google Tasks. The
-frontend was already rebuilt into something clean, professional, and aesthetic. The
-current focus is deploying the app (VPS + Docker Compose, targeting up to ~100
-concurrent users): moving off the single-file `token.json` OAuth storage to per-user
-Postgres-backed sessions, moving the synchronous OpenAI call onto a Redis/arq background
-worker so `/upload-syllabus` returns a `job_id` immediately, and containerizing the
-whole stack behind an HTTPS reverse proxy. The API contract described below (request/
-response shapes) is stable and should not change as part of this work unless a step
-specifically requires it.
+A web app that turns a syllabus PDF into Google Calendar events and Google Tasks. It is
+deployed and live: Docker Compose on a VPS behind an HTTPS reverse proxy, with per-user
+Postgres-backed sessions and a Redis/arq worker so `/upload-syllabus` returns a `job_id`
+immediately instead of blocking on OpenAI. The API contract described below (request/
+response shapes) is stable and should not change unless a step specifically requires it.
 
-Progress so far: the Postgres schema and Alembic migrations are done (see "Database
-layer" below). The auth rework (replacing `token.json` with the `users`/`google_tokens`/
-`sessions` tables) is done — `app/services/session.py` (session-cookie dependency, plus
-`SessionCookieMiddleware` so a fresh session's cookie survives routes that return a
-`Response` subclass directly instead of a plain value), `app/services/token_crypto.py`
-(Fernet encryption for stored tokens), and `app/services/google_credentials.py`
-(`get_credentials()` — turns a `user_id` into usable, auto-refreshing Google
-`Credentials`) are all in place; `/auth/google`, `/auth/google/callback`, and
-`/add-events` are fully wired to the DB, and `token.json` has been removed entirely. The
-Redis/arq job queue is also done: `app/worker.py` (`extract_syllabus_job`, run via
-`arq app.worker.WorkerSettings` as its own process — a local `syllabus-redis` Docker
-container backs it the same way `syllabus-postgres` backs the DB), a `lifespan` hook in
-`app/main.py` creates the arq pool on `app.state.redis`, `/upload-syllabus` in
-`app/routers/syllabus.py` enqueues a job and returns `{"job_id": ...}` immediately, and
-`GET /jobs/{job_id}` polls status/result. `extract_syllabus()` in
-`app/services/openai_extraction.py` is `async` (via `AsyncOpenAI`) so multiple users'
-extractions actually run concurrently on one worker process rather than serializing.
-The frontend polls this too (see "Frontend layout" below). Expired-session and old-job
-cleanup is also done — `app/services/cleanup.py` (`cleanup_expired_sessions`,
-`cleanup_old_jobs`), registered as hourly `cron_jobs` on `WorkerSettings` in
-`app/worker.py`, so it runs inside the same worker process with no separate OS-level
-scheduling needed. `cleanup_expired_sessions` deletes an expired session's `jobs` rows
-before the session itself, since `jobs.session_id` is a FK with no `ON DELETE` behavior
-and would otherwise block the delete. Production-readiness cleanup is done too — see
-"Conventions / gotchas" below for the env vars this introduced. Containerization hasn't
-been started.
-
-### Remaining coding-side work (deployment)
-
-Everything on this list is done. What's left is cloud infra (VPS choice, Docker Compose,
-reverse proxy, domain/DNS, containerization), which is being handled separately.
+### No Google-connection status endpoint
 
 There is deliberately no "is Google connected" status endpoint: the frontend never checks
 connection state up front. It just calls `/add-events`; a 401 (`not_authenticated`)
@@ -83,16 +49,12 @@ consumer.
   why that matters for the session cookie.
 - `backend/` — FastAPI, as an `app/` package (`backend/main.py` is a thin entrypoint,
   `from app.main import app`, kept only so `uvicorn main:app --reload` from `backend/`
-  with the venv active still works as documented). Layout: `app/main.py` builds the
-  `FastAPI()` instance, sets up CORS, and registers routers; `app/config.py` holds env
-  vars and `.env` loading; `app/routers/` has one module per route group (`health`,
-  `auth`, `syllabus`, `events`); `app/services/` holds the logic each router calls into
-  (`dedupe.py`, `titling.py`, `document_parsing.py`, `openai_extraction.py`,
-  `google_sync.py`); `app/schemas/extraction.py` holds the Pydantic models. Uses OpenAI
-  (model set by the `OPENAI_MODEL` env var) with Structured Outputs to extract data from
-  the uploaded syllabus, and the Google Calendar/Tasks APIs to write events. CORS allows
-  any `localhost`/`127.0.0.1` port in the 5170–5179 range, since Vite moves ports when
-  5173 is taken.
+  with the venv active still works as documented). One module per route group under
+  `app/routers/`, the logic they call into under `app/services/`, and the Pydantic models
+  in `app/schemas/extraction.py`. Uses OpenAI (model set by the `OPENAI_MODEL` env var)
+  with Structured Outputs to extract data from the uploaded syllabus, and the Google
+  Calendar/Tasks APIs to write events. CORS allows any `localhost`/`127.0.0.1` port in
+  the 5170–5179 range, since Vite moves ports when 5173 is taken.
 - The `SyllabusExtraction` Pydantic model in `app/schemas/extraction.py` **is** the data
   model — Structured Outputs guarantees the response matches it, so the schema is the
   contract, not something the prompt has to enforce. `backend/format.json` is a real
@@ -128,70 +90,6 @@ Course codes are prefixed onto every title (`"CSC 242: Midterm 1"`) by `titled()
 `app/services/titling.py`, not by the model — so it applies uniformly and cannot drift
 with phrasing. The model is told to return bare titles.
 
-## Database layer
-
-Local dev Postgres runs as a Docker container (`syllabus-postgres`, image `postgres:16`,
-port 5432, database/user/password all `syllabus`), with a named volume
-(`syllabus-postgres-data`) so data survives container restarts — start it with
-`docker start syllabus-postgres` if it's not running. `app/db/base.py` has the
-SQLAlchemy `engine`, `SessionLocal` factory, `Base` (the declarative base every model
-inherits from, and what Alembic reads via `Base.metadata`), and `get_db()`, a generator-
-based FastAPI dependency that yields a session and closes it in a `finally` block after
-the request completes.
-
-`app/db/models.py` — four tables, all in one file (not a folder-per-model; not worth the
-split at this size, and a folder means every model needs an explicit re-import somewhere
-or Alembic's autogenerate silently misses it):
-- `users` — `user_id` (PK), `google_sub` (unique — the real stable identity from
-  Google's ID token, looked up on every login; never a self-generated id), `created_at`.
-  No `email` column — nothing in the app reads it, so it isn't stored.
-- `google_tokens` — `token_id` (PK), `user_id` (FK, unique — one row per user, updated
-  in place on refresh, never accumulated), `access_token`, `refresh_token`,
-  `expires_at`, `updated_at`.
-- `sessions` — `session_id` (PK, the actual browser cookie value), `user_id` (FK,
-  nullable — a session exists *before* login, to carry state across the redirect to
-  Google and back), `oauth_state` (nullable, CSRF value for an in-flight login),
-  `created_at`, `expires_at`.
-- `jobs` — `job_id` (PK, UUID — exposed in a polling URL, so it must not be sequential/
-  guessable), `session_id` (FK to `sessions`, **not** `users`, since uploading and
-  processing a syllabus never requires being logged in — only "Add to Calendar" does),
-  `status` (plain string, not a Postgres enum, so adding a new status later doesn't need
-  its own migration), `result_json`, `created_at`, `updated_at`.
-
-All timestamp columns are `DateTime(timezone=True)` — compare against
-`datetime.now(timezone.utc)`, never naive `datetime.now()`/`utcnow()`.
-
-Migrations live in `alembic/` (config in `alembic.ini`); `alembic/env.py` is wired to
-import `app.db.models` (so every model registers on `Base.metadata` before autogenerate
-runs) and pulls the connection string from `app.config.DATABASE_URL` rather than
-duplicating it in `alembic.ini`. Applied so far: create the four tables, then a follow-up
-migration making the timestamp columns timezone-aware.
-
-Expired `sessions` rows (and old `jobs` rows) aren't left to accumulate — see the
-`cleanup.py` note above. Not worth a synchronous check-on-every-request instead, since
-most expired sessions belong to visitors who never come back to trigger one.
-
-## Frontend layout
-
-The prototype has been replaced. `App.jsx` is now a thin shell composing `MouseTrail`,
-`Header`, `HowItWorks`, and `SyllabusUploader`. Tailwind v4 is wired up via
-`@tailwindcss/vite` in `vite.config.js` and `@import "tailwindcss"` in `index.css`
-(there is no `App.css` and no `tailwind.config.js` — v4 configures via `@theme` in CSS).
-
-- `SyllabusUploader.jsx` owns the whole flow: file select/drag, the `POST` to
-  `/upload-syllabus`, then `pollJobStatus()` calling `GET /jobs/{job_id}` on an interval
-  (capped at `JOB_POLL_MAX_ATTEMPTS` so a stuck job surfaces an error instead of polling
-  forever) until the job is `done` or `failed`, showing `UploadingScreen` the whole time,
-  and then `ReviewModal`. It also adds a `_key` to every item on arrival
-  (`withStableKeys`) because backend items have no stable id and React reuses components
-  across removals without one. `_key` is stripped before the payload goes back to
-  `/add-events`.
-- `components/review/` holds the editing UI: `ReviewModal` drives a select → per-tab
-  review → color-pick → confirm sequence, and delegates rows to `ClassScheduleTab`,
-  `EventsTab` (one-off, date + time range + location), and `DueItemsTab` (deadline
-  only). The latter two are generic over `path`/`indices`/`blankItem`, which is what
-  lets several tabs share one array.
-
 ## Conventions / gotchas
 
 - The app's public URLs are env-driven, not hardcoded, via `app/config.py`:
@@ -208,11 +106,6 @@ The prototype has been replaced. `App.jsx` is now a thin shell composing `MouseT
   PDF didn't specify them — the UI needs to handle nulls gracefully (e.g. all-day
   events, tasks with no due time).
 - `days_of_week` on recurring meetings is always full day names (`"Monday"`, not `"M"`).
-- Secrets/credentials live in `backend/.env`, `backend/credentials.json`,
-  `backend/token.json` — never print or commit their contents. `DATABASE_URL` also comes
-  from `.env` (falls back to the local `syllabus-postgres` container's credentials if
-  unset).
-- `app.db.models.Session` (a browser session row) and `sqlalchemy.orm.Session` (a
-  database session/connection) are unrelated classes with the same name — files that
-  need both import one under an alias (`from app.db.models import Session as
-  BrowserSession`, `from sqlalchemy.orm import Session as DBSession`).
+- Secrets/credentials live in `backend/.env` and `backend/credentials.json` — never print
+  or commit their contents. `DATABASE_URL` also comes from `.env` (falls back to the
+  local `syllabus-postgres` container's credentials if unset).
