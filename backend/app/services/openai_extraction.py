@@ -20,9 +20,10 @@ this take up a block of time, or is it a deadline?" first, then pick the list:
   meetings.
 - tasks - work that is due by a deadline: homework, assignments, papers, projects,
   labs, and problem sets.
-- readings - textbook chapters, articles, books, and class notes to read. Where a
-  schedule row gives both a lecture topic and the material for it, the reading is the
-  material, never the topic, and its date is that row's date.
+- readings - textbook chapters, articles, books, and class notes the syllabus assigns
+  to be read. Where the schedule sets aside a place for assigned material and a row
+  gives both a lecture topic and the material for it, the reading is the material,
+  never the topic, and its date is that row's date.
 - class_cancellations - "No Class", holidays, breaks, and university closures.
 
 The confusions worth naming: a repeating class is never an event, an exam is never a
@@ -67,6 +68,11 @@ Rules:
   or "Discussion Posts". Say so in warnings instead. Outside class_schedule.meetings,
   every item covers exactly one date.
 - If a reading is listed as TBD, leave it out of readings and add it to warnings instead.
+- A reading exists only where the syllabus assigns something to be read: a column or
+  heading holding assigned material, or wording telling the student to read or prepare
+  it. Where a schedule only states what each session covers, that description belongs to
+  the meeting it describes, including any chapter or section number written as part of
+  it, and those rows produce nothing for readings.
 - Take start_date and end_date from the first and last dated class meetings where the
   syllabus has a dated schedule, otherwise from whatever states the term's span. Mark
   confidence as medium if inferred.
