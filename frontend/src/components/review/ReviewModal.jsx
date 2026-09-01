@@ -104,21 +104,44 @@ const TAB_CONFIG = [
 // Distinct paths, for the _key strip that runs over everything on confirm.
 const ALL_PATHS = [...new Set(TAB_CONFIG.map((tab) => tab.path))];
 
-// Everything except class_schedule needs a date to be synced at all -
-// class_schedule meetings fall back to an inferred term span instead (see
-// term_bounds in google_sync.py).
-const REQUIRED_DATE_FIELD = { events: "date", tasks: "due_date", readings: "due_date" };
+// What each path needs before it can be scheduled, mirroring google_sync.py, plus
+// what to tell the user when it is absent. A dated item needs its date. A meeting
+// needs days and times instead: its start/end dates fall back to an inferred term
+// span (term_bounds), but add_class_schedule still skips any meeting missing a day
+// or a time - and a syllabus that names a recitation without ever saying when it
+// meets produces exactly that, so it would otherwise reach the calendar silently
+// dropped.
+const SYNC_REQUIREMENT = {
+  events: {
+    isIncomplete: (item) => !item.date,
+    message: "Any events without dates will not be added.",
+  },
+  tasks: {
+    isIncomplete: (item) => !item.due_date,
+    message: "Any tasks without dates will not be added.",
+  },
+  readings: {
+    isIncomplete: (item) => !item.due_date,
+    message: "Any readings without dates will not be added.",
+  },
+  "class_schedule.meetings": {
+    isIncomplete: (item) => !item.days_of_week?.length || !item.start_time || !item.end_time,
+    message: "Any meetings without days and times will not be added.",
+  },
+};
 
 // Checked against reviewSteps (the tabs the user opted into) and each tab's
 // own indices/items, so a deselected category or a deleted item - which is
 // simply absent from those - can never trigger this.
-function tabHasMissingDates(tab) {
-  const field = REQUIRED_DATE_FIELD[tab.path];
-  return field ? tab.indices.some((index) => !tab.items[index][field]) : false;
+function tabIsIncomplete(tab) {
+  const requirement = SYNC_REQUIREMENT[tab.path];
+  return requirement
+    ? tab.indices.some((index) => requirement.isIncomplete(tab.items[index]))
+    : false;
 }
 
 function findFirstInvalidStep(steps) {
-  return steps.findIndex(tabHasMissingDates);
+  return steps.findIndex(tabIsIncomplete);
 }
 
 function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitError }) {
@@ -157,7 +180,7 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   // reviewing, otherwise the step index would point past the shrunk list.
   const reviewSteps = tabs.filter((tab) => selectedTabs.has(tab.id));
   const currentTab = typeof step === "number" ? reviewSteps[step] : null;
-  const currentTabHasMissingDates = validationAttempted && currentTab && tabHasMissingDates(currentTab);
+  const currentTabIsIncomplete = validationAttempted && currentTab && tabIsIncomplete(currentTab);
 
   function updateItem(path, index, field, value) {
     onChange((prev) => {
@@ -211,8 +234,13 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   }
 
   function handleConfirm() {
+    // Warn once, then let it through. Blocking outright traps the user on facts
+    // the syllabus does not contain - a final exam the registrar has not scheduled,
+    // a recitation with no stated day - which they cannot supply and should not have
+    // to delete. The backend skips an incomplete item and names it in the response,
+    // so proceeding is safe, and the warning stays on screen either way.
     const invalidStep = findFirstInvalidStep(reviewSteps);
-    if (invalidStep !== -1) {
+    if (invalidStep !== -1 && !validationAttempted) {
       setValidationAttempted(true);
       setStep(invalidStep);
       return;
@@ -335,9 +363,9 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Review and Edit the <span className="font-bold">{currentTab.label}</span> to Your Preferences
               </p>
-              {currentTabHasMissingDates && (
-                <p className="mt-2 text-sm font-medium text-red-500">
-                  Any events/tasks without dates will not be added.
+              {currentTabIsIncomplete && (
+                <p className="mt-2 text-sm font-medium text-red-500 dark:text-red-400">
+                  {SYNC_REQUIREMENT[currentTab.path].message}
                 </p>
               )}
             </div>
