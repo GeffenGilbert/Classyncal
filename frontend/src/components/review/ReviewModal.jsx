@@ -234,13 +234,13 @@ function ReviewModal({ data, onChange, onClose, onConfirm, isSubmitting, submitE
   }
 
   function handleConfirm() {
-    // Warn once, then let it through. Blocking outright traps the user on facts
-    // the syllabus does not contain - a final exam the registrar has not scheduled,
-    // a recitation with no stated day - which they cannot supply and should not have
-    // to delete. The backend skips an incomplete item and names it in the response,
-    // so proceeding is safe, and the warning stays on screen either way.
+    // Deliberately a hard stop, not a warning: an item that cannot be scheduled is
+    // sent back to be dated or removed, rather than being quietly dropped at sync.
+    // The cost is that a syllabus listing a final exam as TBD has to be resolved by
+    // hand before anything can be added, which the date-reminder UI is meant to make
+    // less blunt.
     const invalidStep = findFirstInvalidStep(reviewSteps);
-    if (invalidStep !== -1 && !validationAttempted) {
+    if (invalidStep !== -1) {
       setValidationAttempted(true);
       setStep(invalidStep);
       return;
