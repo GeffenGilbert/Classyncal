@@ -45,9 +45,12 @@ def titled(payload, name, fallback):
         return name
     return f"{code}: {name}"
 
-# Applied to the extraction before it reaches the review screen, so the titles the
-# user edits are the titles that get created. titled() still runs at sync time and is
-# idempotent, which covers anything the user adds by hand while reviewing.
+# The one place the course code is applied, run on the extraction before it reaches
+# the review screen - so the titles the user reviews and edits are exactly the titles
+# that get created. google_sync deliberately does not prefix again: a second pass has
+# to guess whether a title already carries the code, and guessing wrong is what
+# produced "CSC214: CSC 214: Reading 1". The cost is that an item the user adds by
+# hand while reviewing keeps the title they typed, unprefixed.
 def apply_course_code(payload):
     defaults = {
         "events": "Event",

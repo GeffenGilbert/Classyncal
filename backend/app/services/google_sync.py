@@ -1,7 +1,6 @@
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
-from app.services.titling import titled
 
 
 def create_repeating_event(
@@ -200,7 +199,7 @@ def add_class_schedule(payload, service, color_id):
     report = {"added": 0, "dates_inferred": 0, "skipped": []}
 
     for meeting in meetings:
-        title = titled(payload, meeting.get("title"), "Class Meeting")
+        title = (meeting.get("title") or "").strip() or "Class Meeting"
         days_of_week = meeting.get("days_of_week", [])
         start_time = meeting.get("start_time")
         end_time = meeting.get("end_time")
@@ -251,7 +250,7 @@ def add_events_to_calendar(payload, service, color_id):
         if not date:
             continue
 
-        title = titled(payload, event.get("title"), "Event")
+        title = (event.get("title") or "").strip() or "Event"
 
         if start_time and end_time:
             start = date + "T" + start_time + ":00"
@@ -287,7 +286,7 @@ def add_due_items(payload, items, service, default_title):
 
         create_task(
             service,
-            titled(payload, item.get("title"), default_title),
+            (item.get("title") or "").strip() or default_title,
             due_date,
             item.get("due_time"),
             item.get("description", ""),
